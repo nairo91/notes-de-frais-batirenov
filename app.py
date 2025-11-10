@@ -77,7 +77,6 @@ def get_db():
     )
     return conn
 
-
 def init_db():
     conn = get_db()
     cur = conn.cursor()
@@ -113,10 +112,6 @@ def init_db():
 
     conn.commit()
     conn.close()
-
-
-# IMPORTANT : on initialise la DB au chargement du module
-init_db()
 
 
 def sync_users_from_csv():
@@ -174,6 +169,10 @@ def sync_users_from_csv():
     conn.close()
     print("Synchronisation des utilisateurs depuis users.csv terminée.")
 
+
+# 👉 IMPORTANT : on initialise la DB **et** on synchronise les users
+init_db()
+sync_users_from_csv()
 
 # -----------------------------------------------------------------------------#
 # AUTH / ROLES
