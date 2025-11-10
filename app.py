@@ -14,6 +14,9 @@ from functools import wraps
 import cloudinary
 import cloudinary.uploader
 
+import io
+from PIL import Image
+
 # -----------------------------------------------------------------------------
 # CONFIG FLASK
 # -----------------------------------------------------------------------------
@@ -364,10 +367,29 @@ def scan_receipt():
     if not ocr_api_key:
         return jsonify({"error": "OCR non configuré (OCRSPACE_API_KEY manquant)"}), 500
 
+      # On compresse/redimensionne l'image pour rester < 1 Mo
     try:
+        # Charger l'image en mémoire
+        img = Image.open(file.stream)
+
+        # Redimensionner si trop grande (ex: largeur max 1200 px)
+        max_width = 1200
+        if img.width > max_width:
+            ratio = max_width / float(img.width)
+            new_height = int(float(img.height) * ratio)
+            img = img.resize((max_width, new_height))
+
+        # Ré-encoder en JPEG compressé
+        buf = io.BytesIO()
+        img = img.convert("RGB")  # au cas où PNG / etc.
+        img.save(buf, format="JPEG", quality=60)  # qualité 60 = léger
+        buf.seek(0)
+
+        # Envoyer ce buffer compressé à OCR.Space
+        files = {"file": ("ticket.jpg", buf, "image/jpeg")}
         resp = requests.post(
             ocr_url,
-            files={"file": (file.filename, file.stream, file.mimetype)},
+            files=files,
             data={
                 "apikey": ocr_api_key,
                 "language": "fre",
@@ -379,6 +401,7 @@ def scan_receipt():
         data = resp.json()
     except Exception as e:
         return jsonify({"error": f"Erreur OCR: {e}"}), 500
+
 
     # Si l'API indique une erreur
     if data.get("IsErroredOnProcessing"):
