@@ -35,9 +35,18 @@
             <input type="text" class="form-control" name="chantier" placeholder="Ex: Chantier Dupont" required>
           </div>
 
+          <!-- Justificatif + bouton Scanner le ticket -->
           <div>
             <label class="form-label">Justificatif (photo ticket / facture)</label>
-            <input type="file" class="form-control" name="receipt" accept="image/*">
+            <div class="d-flex gap-2">
+              <input type="file" class="form-control" name="receipt" id="receipt-input" accept="image/*">
+              <button type="button" class="btn btn-outline-secondary btn-sm" onclick="scanTicket()">
+                Scanner le ticket
+              </button>
+            </div>
+            <small class="text-muted">
+              Le scan tente de remplir automatiquement le montant, la date et le libellé.
+            </small>
           </div>
 
           <button type="submit" class="btn btn-success w-100">
@@ -53,7 +62,13 @@
     <div class="card shadow-sm mb-3">
       <div class="card-body">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-          <h2 class="h5 mb-0">Mes notes de frais</h2>
+          <h2 class="h5 mb-0">
+            {% if is_admin %}
+              Toutes les notes de frais
+            {% else %}
+              Mes notes de frais
+            {% endif %}
+          </h2>
 
           <div class="d-flex flex-wrap gap-2">
             <input type="date" id="filter-date-from" class="form-control form-control-sm" placeholder="Du">
@@ -96,9 +111,15 @@
                 <td>{{ e.user_email }}</td>
                 <td>
                   {% if e.receipt_path %}
-                    <a href="{{ url_for('uploaded_file', filename=e.receipt_path) }}" target="_blank" class="btn btn-link btn-sm">
-                      Voir
-                    </a>
+                    {% if e.receipt_path.startswith('http') %}
+                      <a href="{{ e.receipt_path }}" target="_blank" class="btn btn-link btn-sm">
+                        Voir
+                      </a>
+                    {% else %}
+                      <a href="{{ url_for('uploaded_file', filename=e.receipt_path) }}" target="_blank" class="btn btn-link btn-sm">
+                        Voir
+                      </a>
+                    {% endif %}
                   {% else %}
                     <span class="text-muted">-</span>
                   {% endif %}
