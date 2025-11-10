@@ -467,6 +467,7 @@ def api_expenses():
         })
     return jsonify(data)
 
+
 # -----------------------------------------------------------------------------#
 # OCR : Scan d'un ticket pour pré-remplir la note (TTC / HT / TVA)
 # -----------------------------------------------------------------------------#
@@ -488,60 +489,67 @@ def _normalize_number(s: str):
 def parse_amounts_ttc_ht_tva(text: str):
     """
     Essaie d'extraire TTC, HT et TVA à partir du texte complet OCR.
-    On parcourt ligne par ligne et on regarde aussi les lignes SUIVANTES
-    si la ligne 'TOTAL', 'HT' ou 'TVA' n'a pas de montant.
+
+    Stratégie :
+      1) TTC : on cherche tous les montants suivis de '€' et on prend le plus grand.
+      2) TVA : on cherche une ligne contenant 'TVA' puis un montant sur la même
+               ligne ou dans le texte après.
+      3) HT  : idem avec 'H.T', 'HT', 'hors taxes', etc.
+      4) Si un des trois manque, on tente de le recalculer via TTC = HT + TVA.
     """
     if not text:
         return {"ttc": None, "ht": None, "tva": None}
 
-    # On découpe en lignes, on nettoie
-    raw_lines = [l for l in text.splitlines()]
+    cleaned_text = text.replace("\u00a0", " ")
+
+    # 1) TTC : montants avec un '€' derrière
+    euro_matches = re.findall(r"(\d+[.,]\d{2})\s*€", cleaned_text)
+    ttc = None
+    if euro_matches:
+        try:
+            nums = [float(m.replace(",", ".")) for m in euro_matches]
+            ttc_val = max(nums)
+            ttc = f"{ttc_val:.2f}"
+        except ValueError:
+            ttc = None
+
+    # On découpe en lignes pour HT/TVA
+    raw_lines = [l for l in cleaned_text.splitlines()]
     lines = [l.strip() for l in raw_lines if l.strip()]
 
-    def find_amount_for_keywords_with_lookahead(keywords, max_lookahead=3):
+    def find_amount_after_keyword(keyword: str):
         """
-        Cherche une ligne qui contient tous les mots-clés,
-        puis essaie de récupérer un montant sur cette ligne.
-        Si pas trouvé, regarde les max_lookahead lignes suivantes.
+        Cherche une ligne qui contient le mot-clé (en minuscules),
+        puis un montant sur la même ligne. Si rien,
+        cherche le premier montant dans tout le texte APRÈS cette ligne.
         """
-        n = len(lines)
+        keyword = keyword.lower()
         for i, line in enumerate(lines):
             lower = line.lower()
-            if all(k in lower for k in keywords):
-                # 1) On cherche de suite sur la ligne
-                matches = re.findall(r'\d+[.,]\d{2}', line)
+            if keyword in lower:
+                # 1) Sur la même ligne
+                matches = re.findall(r"\d+[.,]\d{2}", line)
                 if matches:
                     return _normalize_number(matches[-1])
 
-                # 2) Sinon on regarde les lignes suivantes
-                for j in range(i + 1, min(i + 1 + max_lookahead, n)):
-                    line2 = lines[j]
-                    matches2 = re.findall(r'\d+[.,]\d{2}', line2)
-                    if matches2:
-                        return _normalize_number(matches2[-1])
+                # 2) Sinon, dans ce qui suit
+                tail = "\n".join(lines[i + 1:])
+                matches2 = re.findall(r"\d+[.,]\d{2}", tail)
+                if matches2:
+                    return _normalize_number(matches2[0])
         return None
 
-    # TTC : TOTAL (peu importe la casse)
-    ttc = find_amount_for_keywords_with_lookahead(["total"])
+    # 2) TVA
+    tva = find_amount_after_keyword("tva")
 
-    # HT : H.T., HT, Hors Taxes, etc.
-    # On gère aussi le cas où l'OCR a mal lu "H.T." → on regarde "ht" tout court
-    ht = (
-        find_amount_for_keywords_with_lookahead(["h.t"]) or
-        find_amount_for_keywords_with_lookahead(["ht"]) or
-        find_amount_for_keywords_with_lookahead(["hors", "tax"])
-    )
+    # 3) HT
+    ht = None
+    for kw in ["h.t", "ht", "hors taxes", "hors taxe"]:
+        ht = find_amount_after_keyword(kw)
+        if ht:
+            break
 
-    # TVA
-    tva = find_amount_for_keywords_with_lookahead(["tva"])
-
-    # Fallback global : si on n'a toujours pas de TTC, on prend le dernier montant dans tout le texte
-    if ttc is None:
-        all_amounts = re.findall(r'\d+[.,]\d{2}', text.replace(" ", ""))
-        if all_amounts:
-            ttc = _normalize_number(all_amounts[-1])
-
-    # Fallbacks calculés
+    # 4) Fallbacks calculés
     try:
         ttc_f = float(ttc) if ttc is not None else None
         ht_f = float(ht) if ht is not None else None
@@ -605,7 +613,7 @@ def scan_receipt():
     if not ocr_api_key:
         return jsonify({"error": "OCR non configuré (OCRSPACE_API_KEY manquant)"}), 500
 
-    # On compresse/redimensionne l'image pour rester < 1 Mo
+    # On compresse/redimensionne l'image pour rester raisonnable
     try:
         img = Image.open(file.stream)
 
