@@ -45,6 +45,7 @@ def init_db():
     conn.commit()
     conn.close()
 
+init_db()
 # Auth via CSV
 USERS = {}  # email -> {password, nom, prenom}
 
