@@ -85,7 +85,10 @@
         </div>
 
         <div class="table-responsive">
-          <table class="table table-sm table-hover align-middle" id="expenses-table">
+         <table class="table table-sm table-hover align-middle"
+       id="expenses-table"
+       data-is-admin="{{ 'true' if is_admin else 'false' }}">
+
             <thead class="table-light">
               <tr>
                 <th>Date</th>

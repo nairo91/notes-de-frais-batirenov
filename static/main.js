@@ -1,159 +1,240 @@
+// static/main.js
+
 let allExpenses = [];
-let currentSort = null;
+let isAdmin = false;
 
-async function fetchExpenses() {
-    try {
-        const res = await fetch("/api/expenses");
-        if (!res.ok) {
-            console.error("Erreur API /api/expenses");
-            return;
-        }
-        allExpenses = await res.json();
-        renderExpenses();
-    } catch (err) {
-        console.error("Erreur fetchExpenses:", err);
-    }
+function loadExpenses() {
+  const table = document.getElementById("expenses-table");
+  if (!table) return;
+
+  isAdmin = table.dataset.isAdmin === "true";
+
+  fetch("/api/expenses")
+    .then((res) => res.json())
+    .then((data) => {
+      allExpenses = data;
+      renderExpenses(allExpenses);
+    })
+    .catch((err) => {
+      console.error("Erreur lors du chargement des notes de frais :", err);
+    });
 }
 
-function renderExpenses() {
-    const tbody = document.querySelector("#expenses-table tbody");
-    if (!tbody) return;
+function renderExpenses(expenses) {
+  const tbody = document.querySelector("#expenses-table tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
 
-    const dateFrom = document.getElementById("filter-date-from")?.value || "";
-    const dateTo = document.getElementById("filter-date-to")?.value || "";
-    const chantierFilter = (document.getElementById("filter-chantier")?.value || "").toLowerCase();
+  expenses.forEach((e) => {
+    const tr = document.createElement("tr");
 
-    let data = [...allExpenses];
+    // Date
+    const tdDate = document.createElement("td");
+    tdDate.dataset.date = e.date;
+    tdDate.textContent = e.date;
+    tr.appendChild(tdDate);
 
-    if (dateFrom) {
-        data = data.filter(e => e.date >= dateFrom);
+    // Montant
+    const tdAmount = document.createElement("td");
+    tdAmount.dataset.amount = e.amount;
+    tdAmount.textContent = Number(e.amount).toFixed(2) + " €";
+    tr.appendChild(tdAmount);
+
+    // Libellé
+    const tdLabel = document.createElement("td");
+    tdLabel.textContent = e.label;
+    tr.appendChild(tdLabel);
+
+    // Chantier
+    const tdChantier = document.createElement("td");
+    tdChantier.classList.add("chantier-cell");
+    tdChantier.textContent = e.chantier;
+    tr.appendChild(tdChantier);
+
+    // Utilisateur
+    const tdUser = document.createElement("td");
+    tdUser.textContent = e.user_email;
+    tr.appendChild(tdUser);
+
+    // Statut
+    const tdStatus = document.createElement("td");
+    let badgeSpan = document.createElement("span");
+    badgeSpan.classList.add("badge");
+
+    if (e.status === "approved") {
+      badgeSpan.classList.add("bg-success");
+      badgeSpan.textContent = "Validée";
+    } else if (e.status === "rejected") {
+      badgeSpan.classList.add("bg-danger");
+      badgeSpan.textContent = "Refusée";
+    } else {
+      badgeSpan.classList.add("bg-secondary");
+      badgeSpan.textContent = "En attente";
     }
-    if (dateTo) {
-        data = data.filter(e => e.date <= dateTo);
+    tdStatus.appendChild(badgeSpan);
+
+    if (e.validated_by) {
+      const info = document.createElement("small");
+      info.classList.add("text-muted");
+      let txt = " par " + e.validated_by;
+      if (e.validated_at) {
+        txt += " le " + e.validated_at.substring(0, 10);
+      }
+      info.textContent = " " + txt;
+      tdStatus.appendChild(document.createElement("br"));
+      tdStatus.appendChild(info);
     }
 
-    if (chantierFilter) {
-        data = data.filter(e =>
-            (e.chantier || "").toLowerCase().includes(chantierFilter)
-        );
+    tr.appendChild(tdStatus);
+
+    // Justificatif
+    const tdJustif = document.createElement("td");
+    if (e.receipt_path) {
+      const a = document.createElement("a");
+      a.textContent = "Voir";
+      a.classList.add("btn", "btn-link", "btn-sm");
+      a.target = "_blank";
+
+      if (e.receipt_path.startsWith("http")) {
+        a.href = e.receipt_path;
+      } else {
+        a.href = "/uploads/" + e.receipt_path;
+      }
+      tdJustif.appendChild(a);
+    } else {
+      const span = document.createElement("span");
+      span.classList.add("text-muted");
+      span.textContent = "-";
+      tdJustif.appendChild(span);
+    }
+    tr.appendChild(tdJustif);
+
+    // Actions (admin uniquement)
+    if (isAdmin) {
+      const tdActions = document.createElement("td");
+      const actionsDiv = document.createElement("div");
+      actionsDiv.classList.add("d-flex", "flex-wrap", "gap-1");
+
+      if (e.status !== "approved") {
+        const formApprove = document.createElement("form");
+        formApprove.method = "post";
+        formApprove.action = `/admin/expenses/${e.id}/approve`;
+
+        const btnApprove = document.createElement("button");
+        btnApprove.type = "submit";
+        btnApprove.classList.add("btn", "btn-success", "btn-sm");
+        btnApprove.textContent = "Valider";
+
+        formApprove.appendChild(btnApprove);
+        actionsDiv.appendChild(formApprove);
+      }
+
+      if (e.status !== "rejected") {
+        const formReject = document.createElement("form");
+        formReject.method = "post";
+        formReject.action = `/admin/expenses/${e.id}/reject`;
+
+        const btnReject = document.createElement("button");
+        btnReject.type = "submit";
+        btnReject.classList.add("btn", "btn-outline-danger", "btn-sm");
+        btnReject.textContent = "Refuser";
+
+        formReject.appendChild(btnReject);
+        actionsDiv.appendChild(formReject);
+      }
+
+      tdActions.appendChild(actionsDiv);
+      tr.appendChild(tdActions);
     }
 
-    if (currentSort === "date") {
-        data.sort((a, b) => a.date.localeCompare(b.date));
-    } else if (currentSort === "amount") {
-        data.sort((a, b) => a.amount - b.amount);
-    }
-
-    tbody.innerHTML = "";
-    for (const e of data) {
-        const isUrl = e.receipt_path && e.receipt_path.startsWith("http");
-        const receiptCell = e.receipt_path
-            ? (isUrl
-                ? `<a href="${e.receipt_path}" target="_blank" class="btn btn-link btn-sm">Voir</a>`
-                : `<a href="/uploads/${e.receipt_path}" target="_blank" class="btn btn-link btn-sm">Voir</a>`)
-            : '<span class="text-muted">-</span>';
-
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-            <td>${e.date}</td>
-            <td>${Number(e.amount).toFixed(2)} €</td>
-            <td>${e.label}</td>
-            <td>${e.chantier}</td>
-            <td>${e.user_email}</td>
-            <td>${receiptCell}</td>
-        `;
-        tbody.appendChild(tr);
-    }
+    tbody.appendChild(tr);
+  });
 }
 
-function sortExpenses(field) {
-    currentSort = field;
-    renderExpenses();
+/* -------- Filtres / Tri -------- */
+
+function getFilteredExpenses() {
+  const from = document.getElementById("filter-date-from")?.value;
+  const to = document.getElementById("filter-date-to")?.value;
+  const chantierFilter = document.getElementById("filter-chantier")?.value.toLowerCase() || "";
+
+  return allExpenses.filter((e) => {
+    if (from && e.date < from) return false;
+    if (to && e.date > to) return false;
+    if (chantierFilter && !e.chantier.toLowerCase().includes(chantierFilter)) return false;
+    return true;
+  });
 }
 
 function resetFilters() {
-    const df = document.getElementById("filter-date-from");
-    const dt = document.getElementById("filter-date-to");
-    const ch = document.getElementById("filter-chantier");
-    if (df) df.value = "";
-    if (dt) dt.value = "";
-    if (ch) ch.value = "";
-    currentSort = null;
-    renderExpenses();
+  const from = document.getElementById("filter-date-from");
+  const to = document.getElementById("filter-date-to");
+  const chantier = document.getElementById("filter-chantier");
+  if (from) from.value = "";
+  if (to) to.value = "";
+  if (chantier) chantier.value = "";
+  renderExpenses(allExpenses);
 }
 
-// --- SCAN TICKET (OCR) ---
-async function scanTicket() {
-    const input = document.getElementById("receipt-input");
-    if (!input || !input.files || !input.files[0]) {
-        alert("Choisissez d'abord un fichier ticket/facture.");
-        return;
+function sortExpenses(by) {
+  const filtered = getFilteredExpenses().slice(); // copie
+  if (by === "date") {
+    filtered.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  } else if (by === "amount") {
+    filtered.sort((a, b) => Number(b.amount) - Number(a.amount));
+  }
+  renderExpenses(filtered);
+}
+
+/* -------- Scan ticket -------- */
+
+function setupScanButton() {
+  const btn = document.getElementById("scan-receipt-btn");
+  if (!btn) return;
+
+  btn.addEventListener("click", () => {
+    const fileInput = document.querySelector('input[name="receipt"]');
+    if (!fileInput || !fileInput.files.length) {
+      alert("Choisis d'abord une image de ticket.");
+      return;
     }
 
-    const file = input.files[0];
     const formData = new FormData();
-    formData.append("receipt", file);
+    formData.append("receipt", fileInput.files[0]);
 
-    try {
-        const btns = document.querySelectorAll("button[onclick='scanTicket()']");
-        btns.forEach(b => b.disabled = true);
-
-        const res = await fetch("/api/scan_receipt", {
-            method: "POST",
-            body: formData,
-        });
-
-        const data = await res.json();
-
-        // Si le backend a renvoyé une erreur ou un message explicite
-        if (!res.ok || data.error) {
-            console.error("Erreur OCR:", data);
-            alert(data.error || "Erreur lors du scan du ticket.");
-            return;
+    fetch("/api/scan_receipt", {
+      method: "POST",
+      body: formData,
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.error) {
+          alert(data.error);
+          return;
         }
-
-        let changed = false;
-
         if (data.amount) {
-            const amountInput = document.querySelector("input[name='amount']");
-            if (amountInput) {
-                amountInput.value = data.amount;
-                changed = true;
-            }
+          const amountInput = document.querySelector('input[name="amount"]');
+          if (amountInput) amountInput.value = data.amount;
         }
         if (data.date) {
-            const dateInput = document.querySelector("input[name='date']");
-            if (dateInput) {
-                dateInput.value = data.date;
-                changed = true;
-            }
+          const dateInput = document.querySelector('input[name="date"]');
+          if (dateInput) dateInput.value = data.date;
         }
         if (data.label) {
-            const labelInput = document.querySelector("input[name='label']");
-            if (labelInput && !labelInput.value) {
-                labelInput.value = data.label;
-                changed = true;
-            }
+          const labelInput = document.querySelector('input[name="label"]');
+          if (labelInput) labelInput.value = data.label;
         }
-
-        if (!changed) {
-            alert("Le ticket a été lu, mais aucun montant ou date n'ont été détectés.");
-            console.log("Texte OCR brut :", data.raw_text);
-        }
-
-    } catch (err) {
-        console.error("Erreur scanTicket:", err);
-        alert("Impossible de scanner le ticket pour le moment.");
-    } finally {
-        const btns = document.querySelectorAll("button[onclick='scanTicket()']");
-        btns.forEach(b => b.disabled = false);
-    }
+      })
+      .catch((err) => {
+        console.error("Erreur pendant le scan :", err);
+        alert("Erreur lors du scan du ticket.");
+      });
+  });
 }
 
+/* -------- Init -------- */
 
 document.addEventListener("DOMContentLoaded", () => {
-    const table = document.getElementById("expenses-table");
-    if (table) {
-        fetchExpenses();
-    }
+  loadExpenses();
+  setupScanButton();
 });
