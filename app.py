@@ -467,14 +467,13 @@ def api_expenses():
         })
     return jsonify(data)
 
-
 # -----------------------------------------------------------------------------#
 # OCR : Scan d'un ticket pour pré-remplir la note (TTC / HT / TVA)
 # -----------------------------------------------------------------------------#
 
 def _normalize_number(s: str):
     """
-    Convertit '10,90' ou '10.90' -> '10.90'
+    Convertit '10,90' ou '10.90' -> '10.90'.
     Retourne une chaîne (on laisse le JS convertir en nombre).
     """
     if not s:
@@ -489,33 +488,60 @@ def _normalize_number(s: str):
 def parse_amounts_ttc_ht_tva(text: str):
     """
     Essaie d'extraire TTC, HT et TVA à partir du texte complet OCR.
-    On cherche ligne par ligne des mots-clés (TOTAL, H.T, TVA, etc.).
+    On parcourt ligne par ligne et on regarde aussi les lignes SUIVANTES
+    si la ligne 'TOTAL', 'HT' ou 'TVA' n'a pas de montant.
     """
     if not text:
         return {"ttc": None, "ht": None, "tva": None}
 
     # On découpe en lignes, on nettoie
-    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    raw_lines = [l for l in text.splitlines()]
+    lines = [l.strip() for l in raw_lines if l.strip()]
 
-    def find_amount_for_keywords(keywords):
-        for line in lines:
+    def find_amount_for_keywords_with_lookahead(keywords, max_lookahead=3):
+        """
+        Cherche une ligne qui contient tous les mots-clés,
+        puis essaie de récupérer un montant sur cette ligne.
+        Si pas trouvé, regarde les max_lookahead lignes suivantes.
+        """
+        n = len(lines)
+        for i, line in enumerate(lines):
             lower = line.lower()
             if all(k in lower for k in keywords):
-                # ex : "TOTAL 10,90 €" → on prend le dernier nombre
+                # 1) On cherche de suite sur la ligne
                 matches = re.findall(r'\d+[.,]\d{2}', line)
                 if matches:
                     return _normalize_number(matches[-1])
+
+                # 2) Sinon on regarde les lignes suivantes
+                for j in range(i + 1, min(i + 1 + max_lookahead, n)):
+                    line2 = lines[j]
+                    matches2 = re.findall(r'\d+[.,]\d{2}', line2)
+                    if matches2:
+                        return _normalize_number(matches2[-1])
         return None
 
-    # Sur ton ticket :
-    #  - TOTAL 10,90 €
-    #  - H.T. 5,5% 10,33 €
-    #  - TVA 5,5% 0,57 €
-    ttc = find_amount_for_keywords(["total"])
-    ht = find_amount_for_keywords(["h.t"]) or find_amount_for_keywords(["ht"])
-    tva = find_amount_for_keywords(["tva"])
+    # TTC : TOTAL (peu importe la casse)
+    ttc = find_amount_for_keywords_with_lookahead(["total"])
 
-    # Fallbacks : si un montant manque on essaie de le recalculer
+    # HT : H.T., HT, Hors Taxes, etc.
+    # On gère aussi le cas où l'OCR a mal lu "H.T." → on regarde "ht" tout court
+    ht = (
+        find_amount_for_keywords_with_lookahead(["h.t"]) or
+        find_amount_for_keywords_with_lookahead(["ht"]) or
+        find_amount_for_keywords_with_lookahead(["hors", "tax"])
+    )
+
+    # TVA
+    tva = find_amount_for_keywords_with_lookahead(["tva"])
+
+    # Fallback global : si on n'a toujours pas de TTC, on prend le dernier montant dans tout le texte
+    if ttc is None:
+        all_amounts = re.findall(r'\d+[.,]\d{2}', text.replace(" ", ""))
+        if all_amounts:
+            ttc = _normalize_number(all_amounts[-1])
+
+    # Fallbacks calculés
     try:
         ttc_f = float(ttc) if ttc is not None else None
         ht_f = float(ht) if ht is not None else None
@@ -542,8 +568,13 @@ def parse_amounts_ttc_ht_tva(text: str):
 
 
 def extract_date(text: str):
+    """
+    Cherche une date JJ/MM/AAAA ou AAAA-MM-JJ.
+    Retourne une date ISO (YYYY-MM-DD) ou None.
+    """
     if not text:
         return None
+
     # format français JJ/MM/AAAA
     m = re.search(r"(\d{2}/\d{2}/\d{4})", text)
     if m:
@@ -552,10 +583,12 @@ def extract_date(text: str):
             return d.isoformat()
         except ValueError:
             pass
+
     # format ISO AAAA-MM-JJ
     m = re.search(r"(\d{4}-\d{2}-\d{2})", text)
     if m:
         return m.group(1)
+
     return None
 
 
@@ -618,7 +651,7 @@ def scan_receipt():
 
     text = " ".join(r.get("ParsedText", "") for r in parsed_results) or ""
 
-    # (optionnel) log pour debug dans Render
+    # Logs debug dans Render (pratique)
     print("=== OCR RAW TEXT ===")
     print(text)
     print("====================")
@@ -633,7 +666,7 @@ def scan_receipt():
     date_str = extract_date(text)
     label_guess = text.strip().replace("\n", " ")[:80] if text else ""
 
-    # Si vraiment rien n'a été trouvé, on renvoie au moins le texte brut
+    # Si vraiment rien d'exploitable
     if not amount and not amount_ht and not tva_amount and not date_str:
         return jsonify({
             "error": "Le ticket a été lu mais aucun montant ou date n'ont été détectés.",
@@ -641,9 +674,9 @@ def scan_receipt():
         }), 500
 
     return jsonify({
-        "amount": amount,
-        "amount_ht": amount_ht,
-        "tva_amount": tva_amount,
+        "amount": amount,          # TTC
+        "amount_ht": amount_ht,    # HT (peut être None)
+        "tva_amount": tva_amount,  # TVA (peut être None)
         "date": date_str,
         "label": label_guess,
         "raw_text": text,
