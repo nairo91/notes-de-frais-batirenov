@@ -1,4 +1,3 @@
-// On va charger toutes les notes au chargement de la page
 let allExpenses = [];
 let currentSort = null;
 
@@ -16,19 +15,16 @@ async function fetchExpenses() {
     }
 }
 
-// Applique les filtres et le tri, puis met à jour le tableau
 function renderExpenses() {
     const tbody = document.querySelector("#expenses-table tbody");
     if (!tbody) return;
 
-    // Récupération des filtres
     const dateFrom = document.getElementById("filter-date-from")?.value || "";
     const dateTo = document.getElementById("filter-date-to")?.value || "";
     const chantierFilter = (document.getElementById("filter-chantier")?.value || "").toLowerCase();
 
     let data = [...allExpenses];
 
-    // Filtre par période
     if (dateFrom) {
         data = data.filter(e => e.date >= dateFrom);
     }
@@ -36,23 +32,27 @@ function renderExpenses() {
         data = data.filter(e => e.date <= dateTo);
     }
 
-    // Filtre par chantier (contient)
     if (chantierFilter) {
         data = data.filter(e =>
             (e.chantier || "").toLowerCase().includes(chantierFilter)
         );
     }
 
-    // Tri
     if (currentSort === "date") {
         data.sort((a, b) => a.date.localeCompare(b.date));
     } else if (currentSort === "amount") {
         data.sort((a, b) => a.amount - b.amount);
     }
 
-    // Rendu dans le tableau
     tbody.innerHTML = "";
     for (const e of data) {
+        const isUrl = e.receipt_path && e.receipt_path.startsWith("http");
+        const receiptCell = e.receipt_path
+            ? (isUrl
+                ? `<a href="${e.receipt_path}" target="_blank" class="btn btn-link btn-sm">Voir</a>`
+                : `<a href="/uploads/${e.receipt_path}" target="_blank" class="btn btn-link btn-sm">Voir</a>`)
+            : '<span class="text-muted">-</span>';
+
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td>${e.date}</td>
@@ -60,12 +60,7 @@ function renderExpenses() {
             <td>${e.label}</td>
             <td>${e.chantier}</td>
             <td>${e.user_email}</td>
-            <td>
-                ${e.receipt_path
-                    ? `<a href="/uploads/${e.receipt_path}" target="_blank" class="btn btn-link btn-sm">Voir</a>`
-                    : '<span class="text-muted">-</span>'
-                }
-            </td>
+            <td>${receiptCell}</td>
         `;
         tbody.appendChild(tr);
     }
@@ -87,7 +82,57 @@ function resetFilters() {
     renderExpenses();
 }
 
-// On init quand la page est chargée
+// --- SCAN TICKET (OCR) ---
+async function scanTicket() {
+    const input = document.getElementById("receipt-input");
+    if (!input || !input.files || !input.files[0]) {
+        alert("Choisissez d'abord un fichier ticket/facture.");
+        return;
+    }
+
+    const file = input.files[0];
+    const formData = new FormData();
+    formData.append("receipt", file);
+
+    try {
+        const btns = document.querySelectorAll("button[onclick='scanTicket()']");
+        btns.forEach(b => b.disabled = true);
+
+        const res = await fetch("/api/scan_receipt", {
+            method: "POST",
+            body: formData,
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            console.error("Erreur OCR:", data);
+            alert(data.error || "Erreur lors du scan du ticket.");
+        } else {
+            if (data.amount) {
+                const amountInput = document.querySelector("input[name='amount']");
+                if (amountInput) amountInput.value = data.amount;
+            }
+            if (data.date) {
+                const dateInput = document.querySelector("input[name='date']");
+                if (dateInput) dateInput.value = data.date;
+            }
+            if (data.label) {
+                const labelInput = document.querySelector("input[name='label']");
+                if (labelInput && !labelInput.value) {
+                    labelInput.value = data.label;
+                }
+            }
+        }
+    } catch (err) {
+        console.error("Erreur scanTicket:", err);
+        alert("Impossible de scanner le ticket pour le moment.");
+    } finally {
+        const btns = document.querySelectorAll("button[onclick='scanTicket()']");
+        btns.forEach(b => b.disabled = false);
+    }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     const table = document.getElementById("expenses-table");
     if (table) {
