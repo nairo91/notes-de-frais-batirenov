@@ -1,3 +1,5 @@
+from werkzeug.security import generate_password_hash, check_password_hash
+
 import os
 import csv
 import re
@@ -6,7 +8,7 @@ import psycopg2
 from datetime import datetime, date
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    session, send_from_directory, jsonify, flash
+    session, send_from_directory, jsonify, flash, Response
 )
 from werkzeug.utils import secure_filename
 from functools import wraps
@@ -17,9 +19,9 @@ import cloudinary.uploader
 import io
 from PIL import Image
 
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
 # CONFIG FLASK
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-me-in-env")
 
@@ -30,16 +32,21 @@ UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
 # CONFIG CLOUDINARY (pour les photos de tickets)
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
 CLOUDINARY_URL = os.environ.get("CLOUDINARY_URL")
 if CLOUDINARY_URL:
     cloudinary.config(cloudinary_url=CLOUDINARY_URL)
 
+
 def upload_receipt(file):
-    """Upload du justificatif. Si Cloudinary est configuré, on stocke dans le cloud,
-    sinon en local dans /uploads. On retourne une 'receipt_path' (URL ou nom de fichier)."""
+    """
+    Upload du justificatif.
+    - Si Cloudinary est configuré : upload dans le cloud et on stocke l'URL.
+    - Sinon : stockage en local dans /uploads, on stocke le nom de fichier.
+    On retourne une 'receipt_path' (URL ou nom de fichier).
+    """
     if not file or not file.filename:
         return None
 
@@ -54,10 +61,12 @@ def upload_receipt(file):
         file.save(save_path)
         return filename
 
-# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------#
 # CONFIG BASE DE DONNÉES (PostgreSQL)
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
 DATABASE_URL = os.environ.get("DATABASE_URL")
+
 
 def get_db():
     if not DATABASE_URL:
@@ -68,10 +77,24 @@ def get_db():
     )
     return conn
 
+
 def init_db():
-    """Crée la table expenses si elle n'existe pas."""
     conn = get_db()
     cur = conn.cursor()
+
+    # Table users
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            first_name TEXT,
+            last_name TEXT,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE
+        );
+    """)
+
+    # Table expenses (avec status + validation)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS expenses (
             id SERIAL PRIMARY KEY,
@@ -81,43 +104,85 @@ def init_db():
             label TEXT NOT NULL,
             chantier TEXT NOT NULL,
             receipt_path TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
+            validated_by TEXT,
+            validated_at TIMESTAMPTZ,
             created_at TIMESTAMP NOT NULL
         );
     """)
+
     conn.commit()
     conn.close()
+
 
 # IMPORTANT : on initialise la DB au chargement du module
 init_db()
 
-# -----------------------------------------------------------------------------
-# AUTH : CHARGEMENT DES UTILISATEURS VIA CSV
-# -----------------------------------------------------------------------------
-USERS = {}  # email -> {password, nom, prenom}
 
-ADMIN_EMAILS = {
-    "mirona.orian@batirenov.info",
-    "launay.jeremy@batirenov.info",
-}
-
-def load_users_from_csv():
+def sync_users_from_csv():
+    """
+    Lit users.csv et synchronise dans la table users.
+    - crée les utilisateurs manquants
+    - met à jour prénom/nom si besoin
+    - NE réécrit PAS les mots de passe existants (pour ne pas écraser si on les change plus tard)
+    """
     csv_path = os.path.join(BASE_DIR, "users.csv")
     if not os.path.exists(csv_path):
-        print("⚠️ users.csv introuvable : pas de login possible.")
+        print("users.csv introuvable, pas de synchro utilisateurs.")
         return
+
+    conn = get_db()
+    cur = conn.cursor()
+
     with open(csv_path, encoding="latin-1") as f:
         reader = csv.DictReader(f, delimiter=";")
         for row in reader:
             email = (row.get("email") or "").strip().lower()
             pwd = (row.get("password") or "").strip()
-            if email and pwd:
-                USERS[email] = {
-                    "password": pwd,
-                    "nom": (row.get("Nom") or "").strip(),
-                    "prenom": (row.get("Prenom") or "").strip(),
-                }
+            first_name = (row.get("Prenom") or "").strip()
+            last_name = (row.get("Nom") or "").strip()
 
-load_users_from_csv()
+            if not email or not pwd:
+                continue
+
+            # Vérifier si l'utilisateur existe déjà
+            cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+            existing = cur.fetchone()
+
+            if existing:
+                # Mise à jour prénom/nom, mais on ne touche pas au mot de passe
+                cur.execute(
+                    """
+                    UPDATE users
+                    SET first_name = %s, last_name = %s
+                    WHERE email = %s
+                    """,
+                    (first_name, last_name, email)
+                )
+            else:
+                # Création avec mot de passe hashé
+                password_hash = generate_password_hash(pwd)
+                cur.execute(
+                    """
+                    INSERT INTO users (email, password_hash, first_name, last_name)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (email, password_hash, first_name, last_name)
+                )
+
+    conn.commit()
+    conn.close()
+    print("Synchronisation des utilisateurs depuis users.csv terminée.")
+
+
+# -----------------------------------------------------------------------------#
+# AUTH / ROLES
+# -----------------------------------------------------------------------------#
+ADMIN_EMAILS = {
+    "mirona.orian@batirenov.info",
+    "launay.jeremy@batirenov.info",
+}
+
 
 def login_required(f):
     @wraps(f)
@@ -127,32 +192,71 @@ def login_required(f):
         return f(*args, **kwargs)
     return wrapper
 
+
 def is_admin():
     return session.get("user_email") in ADMIN_EMAILS
 
-# -----------------------------------------------------------------------------
+
+def admin_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if "user_email" not in session or not is_admin():
+            flash("Accès réservé à l'administration.", "danger")
+            return redirect(url_for("expenses"))
+        return f(*args, **kwargs)
+    return wrapper
+
+
+def get_user_by_email(email: str):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT id, email, password_hash, first_name, last_name
+        FROM users
+        WHERE email = %s AND is_active = TRUE
+        """,
+        (email.lower(),)
+    )
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "id": row[0],
+        "email": row[1],
+        "password_hash": row[2],
+        "first_name": row[3] or "",
+        "last_name": row[4] or "",
+    }
+
+
+# -----------------------------------------------------------------------------#
 # ROUTES AUTH
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "").strip()
-        user = USERS.get(email)
-        if user and user["password"] == password:
-            session["user_email"] = email
-            session["user_name"] = (
-                f'{user["prenom"]} {user["nom"]}'.strip() or email
-            )
+
+        user = get_user_by_email(email)
+        if user and check_password_hash(user["password_hash"], password):
+            session["user_email"] = user["email"]
+            full_name = f'{user["first_name"]} {user["last_name"]}'.strip()
+            session["user_name"] = full_name or user["email"]
             return redirect(url_for("expenses"))
         else:
             flash("Email ou mot de passe incorrect", "danger")
+
     return render_template("login.html")
+
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
 
 @app.route("/")
 def index():
@@ -160,9 +264,10 @@ def index():
         return redirect(url_for("expenses"))
     return redirect(url_for("login"))
 
-# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------#
 # ROUTES FICHIERS UPLOAD (fallback local)
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
 @app.route("/uploads/<filename>")
 @login_required
 def uploaded_file(filename):
@@ -170,15 +275,15 @@ def uploaded_file(filename):
     # correspond bien à une note appartenant à l'utilisateur ou à un admin.
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
-# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------#
 # ROUTE PRINCIPALE : NOTES DE FRAIS
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
 @app.route("/expenses", methods=["GET", "POST"])
 @login_required
 def expenses():
     conn = get_db()
     cur = conn.cursor()
-
     current_user = session["user_email"]
 
     if request.method == "POST":
@@ -204,6 +309,7 @@ def expenses():
             file = request.files.get("receipt")
             receipt_path = upload_receipt(file) if file and file.filename else None
 
+            # Status = pending par défaut (défini aussi en base)
             cur.execute(
                 """
                 INSERT INTO expenses
@@ -227,12 +333,13 @@ def expenses():
         conn.close()
         return redirect(url_for("expenses"))
 
-    # ----------- PARTIE LECTURE / AFFICHAGE -----------
+    # ----------- PARTIE LECTURE / AFFICHAGE -----------#
     if is_admin():
         # Admin : voit toutes les notes
         cur.execute(
             """
-            SELECT id, user_email, amount, date, label, chantier, receipt_path, created_at
+            SELECT id, user_email, amount, date, label, chantier,
+                   receipt_path, created_at, status, validated_by, validated_at
             FROM expenses
             ORDER BY date DESC, id DESC
             """
@@ -241,7 +348,8 @@ def expenses():
         # Utilisateur normal : ne voit que ses propres notes
         cur.execute(
             """
-            SELECT id, user_email, amount, date, label, chantier, receipt_path, created_at
+            SELECT id, user_email, amount, date, label, chantier,
+                   receipt_path, created_at, status, validated_by, validated_at
             FROM expenses
             WHERE user_email = %s
             ORDER BY date DESC, id DESC
@@ -263,6 +371,9 @@ def expenses():
             "chantier": r[5],
             "receipt_path": r[6],
             "created_at": r[7].isoformat(),
+            "status": r[8],
+            "validated_by": r[9],
+            "validated_at": r[10].isoformat() if r[10] else None,
         })
 
     return render_template(
@@ -273,9 +384,10 @@ def expenses():
         is_admin=is_admin(),
     )
 
-# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------#
 # API JSON pour le tableau (utilisée par main.js pour filtrer/tri côté client)
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
 @app.route("/api/expenses")
 @login_required
 def api_expenses():
@@ -286,7 +398,8 @@ def api_expenses():
     if is_admin():
         cur.execute(
             """
-            SELECT id, user_email, amount, date, label, chantier, receipt_path, created_at
+            SELECT id, user_email, amount, date, label, chantier,
+                   receipt_path, created_at, status, validated_by, validated_at
             FROM expenses
             ORDER BY date DESC, id DESC
             """
@@ -294,7 +407,8 @@ def api_expenses():
     else:
         cur.execute(
             """
-            SELECT id, user_email, amount, date, label, chantier, receipt_path, created_at
+            SELECT id, user_email, amount, date, label, chantier,
+                   receipt_path, created_at, status, validated_by, validated_at
             FROM expenses
             WHERE user_email = %s
             ORDER BY date DESC, id DESC
@@ -316,12 +430,16 @@ def api_expenses():
             "chantier": r[5],
             "receipt_path": r[6],
             "created_at": r[7].isoformat(),
+            "status": r[8],
+            "validated_by": r[9],
+            "validated_at": r[10].isoformat() if r[10] else None,
         })
     return jsonify(data)
 
-# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------#
 # OCR : Scan d'un ticket pour pré-remplir la note
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
 def extract_amount(text: str):
     if not text:
         return None
@@ -336,6 +454,7 @@ def extract_amount(text: str):
     if matches:
         return matches[-1]
     return None
+
 
 def extract_date(text: str):
     if not text:
@@ -354,6 +473,7 @@ def extract_date(text: str):
         return m.group(1)
     return None
 
+
 @app.route("/api/scan_receipt", methods=["POST"])
 @login_required
 def scan_receipt():
@@ -367,7 +487,7 @@ def scan_receipt():
     if not ocr_api_key:
         return jsonify({"error": "OCR non configuré (OCRSPACE_API_KEY manquant)"}), 500
 
-      # On compresse/redimensionne l'image pour rester < 1 Mo
+    # On compresse/redimensionne l'image pour rester < 1 Mo
     try:
         # Charger l'image en mémoire
         img = Image.open(file.stream)
@@ -402,7 +522,6 @@ def scan_receipt():
     except Exception as e:
         return jsonify({"error": f"Erreur OCR: {e}"}), 500
 
-
     # Si l'API indique une erreur
     if data.get("IsErroredOnProcessing"):
         msg_list = data.get("ErrorMessage") or []
@@ -436,10 +555,10 @@ def scan_receipt():
         "raw_text": text,
     })
 
-# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------#
 # GÉNÉRATION DU RÉCAP MENSUEL + ENVOI MAIL
-# (tient compte de toutes les notes, pour la compta)
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
 def generate_monthly_report(year: int, month: int):
     conn = get_db()
     cur = conn.cursor()
@@ -474,6 +593,7 @@ def generate_monthly_report(year: int, month: int):
         })
     return result
 
+
 def format_report_csv(rows):
     import io
     import csv as csv_module
@@ -490,6 +610,7 @@ def format_report_csv(rows):
             r["receipt_path"] or "",
         ])
     return output.getvalue()
+
 
 def send_report_email(year: int, month: int):
     import smtplib
@@ -530,14 +651,17 @@ def send_report_email(year: int, month: int):
             server.login(user, password)
         server.send_message(msg)
 
+
 @app.route("/admin/send_report_now")
+@admin_required
 def admin_send_report_now():
-    """Route pour tester manuellement l'envoi du rapport."""
+    """Route pour tester manuellement l'envoi du rapport (mois précédent)."""
     today = date.today()
     month = today.month - 1 or 12
     year = today.year if today.month > 1 else today.year - 1
     send_report_email(year, month)
     return "OK"
+
 
 def cli_send_report_cron():
     """Fonction appelée par le cron Render (python app.py send_report_cron)."""
@@ -546,11 +670,91 @@ def cli_send_report_cron():
     year = today.year if today.month > 1 else today.year - 1
     send_report_email(year, month)
 
-# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------#
+# EXPORT CSV MANUEL POUR ADMIN
+# -----------------------------------------------------------------------------#
+@app.route("/admin/export")
+@admin_required
+def admin_export():
+    """
+    Export CSV des notes de frais pour un mois donné.
+    Paramètres GET :
+      - year (obligatoire)
+      - month (obligatoire)
+    Ex: /admin/export?year=2025&month=11
+    """
+    try:
+        year = int(request.args.get("year"))
+        month = int(request.args.get("month"))
+    except (TypeError, ValueError):
+        return "Paramètres year et month invalides", 400
+
+    rows = generate_monthly_report(year, month)
+    csv_content = format_report_csv(rows)
+
+    filename = f"notes-de-frais-{year}-{month:02d}.csv"
+    return Response(
+        csv_content,
+        mimetype="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )
+
+
+# -----------------------------------------------------------------------------#
+# ROUTES ADMIN : VALIDATION / REFUS DES NOTES
+# -----------------------------------------------------------------------------#
+@app.route("/admin/expenses/<int:expense_id>/approve", methods=["POST"])
+@admin_required
+def approve_expense(expense_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        UPDATE expenses
+        SET status = 'approved',
+            validated_by = %s,
+            validated_at = NOW()
+        WHERE id = %s
+        """,
+        (session["user_email"], expense_id)
+    )
+    conn.commit()
+    conn.close()
+    flash("Note de frais validée.", "success")
+    return redirect(url_for("expenses"))
+
+
+@app.route("/admin/expenses/<int:expense_id>/reject", methods=["POST"])
+@admin_required
+def reject_expense(expense_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        UPDATE expenses
+        SET status = 'rejected',
+            validated_by = %s,
+            validated_at = NOW()
+        WHERE id = %s
+        """,
+        (session["user_email"], expense_id)
+    )
+    conn.commit()
+    conn.close()
+    flash("Note de frais refusée.", "warning")
+    return redirect(url_for("expenses"))
+
+
+# -----------------------------------------------------------------------------#
 # MAIN
-# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------#
 if __name__ == "__main__":
     import sys
+    init_db()
+    sync_users_from_csv()
     if len(sys.argv) > 1 and sys.argv[1] == "send_report_cron":
         cli_send_report_cron()
     else:

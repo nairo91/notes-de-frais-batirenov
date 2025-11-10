@@ -91,42 +91,79 @@
 
         <div class="table-responsive">
           <table class="table table-sm table-hover align-middle" id="expenses-table">
-            <thead class="table-light">
-              <tr>
-                <th>Date</th>
-                <th>Montant</th>
-                <th>Libellé</th>
-                <th>Chantier</th>
-                <th>Utilisateur</th>
-                <th>Justificatif</th>
-              </tr>
-            </thead>
-            <tbody>
-            {% for e in expenses %}
-              <tr>
-                <td data-date="{{ e.date }}">{{ e.date }}</td>
-                <td data-amount="{{ e.amount }}">{{ '%.2f'|format(e.amount) }} €</td>
-                <td>{{ e.label }}</td>
-                <td class="chantier-cell">{{ e.chantier }}</td>
-                <td>{{ e.user_email }}</td>
-                <td>
-                  {% if e.receipt_path %}
-                    {% if e.receipt_path.startswith('http') %}
-                      <a href="{{ e.receipt_path }}" target="_blank" class="btn btn-link btn-sm">
-                        Voir
-                      </a>
-                    {% else %}
-                      <a href="{{ url_for('uploaded_file', filename=e.receipt_path) }}" target="_blank" class="btn btn-link btn-sm">
-                        Voir
-                      </a>
-                    {% endif %}
-                  {% else %}
-                    <span class="text-muted">-</span>
-                  {% endif %}
-                </td>
-              </tr>
-            {% endfor %}
-            </tbody>
+          <thead class="table-light">
+  <tr>
+    <th>Date</th>
+    <th>Montant</th>
+    <th>Libellé</th>
+    <th>Chantier</th>
+    <th>Utilisateur</th>
+    <th>Statut</th>
+    <th>Justificatif</th>
+    {% if is_admin %}
+      <th>Actions</th>
+    {% endif %}
+  </tr>
+</thead>
+
+         <tbody>
+{% for e in expenses %}
+  <tr>
+    <td data-date="{{ e.date }}">{{ e.date }}</td>
+    <td data-amount="{{ e.amount }}">{{ '%.2f'|format(e.amount) }} €</td>
+    <td>{{ e.label }}</td>
+    <td class="chantier-cell">{{ e.chantier }}</td>
+    <td>{{ e.user_email }}</td>
+    <td>
+      {% if e.status == 'approved' %}
+        <span class="badge bg-success">Validée</span>
+      {% elif e.status == 'rejected' %}
+        <span class="badge bg-danger">Refusée</span>
+      {% else %}
+        <span class="badge bg-secondary">En attente</span>
+      {% endif %}
+      {% if e.validated_by %}
+        <br><small class="text-muted">
+          par {{ e.validated_by }}{% if e.validated_at %}, le {{ e.validated_at[:10] }}{% endif %}
+        </small>
+      {% endif %}
+    </td>
+    <td>
+      {% if e.receipt_path %}
+        {% if e.receipt_path.startswith('http') %}
+          <a href="{{ e.receipt_path }}" target="_blank" class="btn btn-link btn-sm">
+            Voir
+          </a>
+        {% else %}
+          <a href="{{ url_for('uploaded_file', filename=e.receipt_path) }}" target="_blank" class="btn btn-link btn-sm">
+            Voir
+          </a>
+        {% endif %}
+      {% else %}
+        <span class="text-muted">-</span>
+      {% endif %}
+    </td>
+
+    {% if is_admin %}
+      <td>
+        <div class="d-flex flex-wrap gap-1">
+          {% if e.status != 'approved' %}
+          <form method="post" action="{{ url_for('approve_expense', expense_id=e.id) }}">
+            <button type="submit" class="btn btn-sm btn-outline-success">Valider</button>
+          </form>
+          {% endif %}
+          {% if e.status != 'rejected' %}
+          <form method="post" action="{{ url_for('reject_expense', expense_id=e.id) }}">
+            <button type="submit" class="btn btn-sm btn-outline-danger">Refuser</button>
+          </form>
+          {% endif %}
+        </div>
+      </td>
+    {% endif %}
+  </tr>
+{% endfor %}
+</tbody>
+
           </table>
         </div>
 
