@@ -469,42 +469,76 @@ def api_expenses():
 
 
 # -----------------------------------------------------------------------------#
-# OCR : Scan d'un ticket pour pré-remplir la note
+# OCR : Scan d'un ticket pour pré-remplir la note (TTC / HT / TVA)
 # -----------------------------------------------------------------------------#
-def extract_amount(text: str):
-    if not text:
+
+def _normalize_number(s: str):
+    """
+    Convertit '10,90' ou '10.90' -> '10.90'
+    Retourne une chaîne (on laisse le JS convertir en nombre).
+    """
+    if not s:
         return None
-    cleaned = text.replace(",", ".")
-    # On prend le DERNIER montant avec 2 décimales → souvent le total TTC
-    matches = re.findall(r"(\d+\.\d{2})", cleaned)
-    if matches:
-        return matches[-1]
-    matches = re.findall(r"(\d+)", cleaned)
-    if matches:
-        return matches[-1]
-    return None
+    s = s.strip()
+    s = s.replace(" ", "").replace("\u00a0", "")  # espaces classiques & insécables
+    s = s.replace(",", ".")
+    m = re.search(r"[-+]?\d+(\.\d+)?", s)
+    return m.group(0) if m else None
 
 
-def extract_ht_tva(text: str):
+def parse_amounts_ttc_ht_tva(text: str):
+    """
+    Essaie d'extraire TTC, HT et TVA à partir du texte complet OCR.
+    On cherche ligne par ligne des mots-clés (TOTAL, H.T, TVA, etc.).
+    """
     if not text:
-        return None, None
+        return {"ttc": None, "ht": None, "tva": None}
 
-    cleaned = text.replace(",", ".")
+    # On découpe en lignes, on nettoie
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
 
-    ht_amount = None
-    tva_amount = None
+    def find_amount_for_keywords(keywords):
+        for line in lines:
+            lower = line.lower()
+            if all(k in lower for k in keywords):
+                # ex : "TOTAL 10,90 €" → on prend le dernier nombre
+                matches = re.findall(r'\d+[.,]\d{2}', line)
+                if matches:
+                    return _normalize_number(matches[-1])
+        return None
 
-    # H.T. / HT
-    m_ht = re.search(r"(?:H\.?T\.?|HT)[^0-9]*(\d+\.\d{2})", cleaned, re.IGNORECASE)
-    if m_ht:
-        ht_amount = m_ht.group(1)
+    # Sur ton ticket :
+    #  - TOTAL 10,90 €
+    #  - H.T. 5,5% 10,33 €
+    #  - TVA 5,5% 0,57 €
+    ttc = find_amount_for_keywords(["total"])
+    ht = find_amount_for_keywords(["h.t"]) or find_amount_for_keywords(["ht"])
+    tva = find_amount_for_keywords(["tva"])
 
-    # TVA
-    m_tva = re.search(r"TVA[^0-9]*(\d+\.\d{2})", cleaned, re.IGNORECASE)
-    if m_tva:
-        tva_amount = m_tva.group(1)
+    # Fallbacks : si un montant manque on essaie de le recalculer
+    try:
+        ttc_f = float(ttc) if ttc is not None else None
+        ht_f = float(ht) if ht is not None else None
+        tva_f = float(tva) if tva is not None else None
+    except ValueError:
+        ttc_f = ht_f = tva_f = None
 
-    return ht_amount, tva_amount
+    # TTC absent mais HT + TVA présents
+    if ttc is None and ht_f is not None and tva_f is not None:
+        ttc_f = ht_f + tva_f
+        ttc = f"{ttc_f:.2f}"
+
+    # HT absent mais TTC + TVA présents
+    if ht is None and ttc_f is not None and tva_f is not None:
+        ht_f = ttc_f - tva_f
+        ht = f"{ht_f:.2f}"
+
+    # TVA absente mais TTC + HT présents
+    if tva is None and ttc_f is not None and ht_f is not None:
+        tva_f = ttc_f - ht_f
+        tva = f"{tva_f:.2f}"
+
+    return {"ttc": ttc, "ht": ht, "tva": tva}
 
 
 def extract_date(text: str):
@@ -540,23 +574,19 @@ def scan_receipt():
 
     # On compresse/redimensionne l'image pour rester < 1 Mo
     try:
-        # Charger l'image en mémoire
         img = Image.open(file.stream)
 
-        # Redimensionner si trop grande (ex: largeur max 1200 px)
         max_width = 1200
         if img.width > max_width:
             ratio = max_width / float(img.width)
             new_height = int(float(img.height) * ratio)
             img = img.resize((max_width, new_height))
 
-        # Ré-encoder en JPEG compressé
         buf = io.BytesIO()
-        img = img.convert("RGB")  # au cas où PNG / etc.
-        img.save(buf, format="JPEG", quality=60)  # qualité 60 = léger
+        img = img.convert("RGB")
+        img.save(buf, format="JPEG", quality=60)
         buf.seek(0)
 
-        # Envoyer ce buffer compressé à OCR.Space
         files = {"file": ("ticket.jpg", buf, "image/jpeg")}
         resp = requests.post(
             ocr_url,
@@ -588,13 +618,23 @@ def scan_receipt():
 
     text = " ".join(r.get("ParsedText", "") for r in parsed_results) or ""
 
-    amount = extract_amount(text)
-    amount_ht, tva_amount = extract_ht_tva(text)
+    # (optionnel) log pour debug dans Render
+    print("=== OCR RAW TEXT ===")
+    print(text)
+    print("====================")
+
+    # --- Montants TTC / HT / TVA
+    amounts = parse_amounts_ttc_ht_tva(text)
+    amount = amounts["ttc"]          # TTC pour le champ principal
+    amount_ht = amounts["ht"]
+    tva_amount = amounts["tva"]
+
+    # --- Date & libellé
     date_str = extract_date(text)
     label_guess = text.strip().replace("\n", " ")[:80] if text else ""
 
-    # Si vraiment rien n'a été trouvé, on renvoie quand même le texte brut pour debug
-    if not amount and not date_str and not label_guess:
+    # Si vraiment rien n'a été trouvé, on renvoie au moins le texte brut
+    if not amount and not amount_ht and not tva_amount and not date_str:
         return jsonify({
             "error": "Le ticket a été lu mais aucun montant ou date n'ont été détectés.",
             "raw_text": text,
