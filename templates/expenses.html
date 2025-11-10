@@ -16,8 +16,18 @@
 
         <form method="post" enctype="multipart/form-data" class="vstack gap-3">
           <div>
-            <label class="form-label">Montant (€) *</label>
+            <label class="form-label">Montant TTC (€) *</label>
             <input type="number" step="0.01" min="0" class="form-control" name="amount" required>
+          </div>
+
+          <div>
+            <label class="form-label">Montant HT (€)</label>
+            <input type="number" step="0.01" min="0" class="form-control" name="amount_ht">
+          </div>
+
+          <div>
+            <label class="form-label">TVA (€)</label>
+            <input type="number" step="0.01" min="0" class="form-control" name="tva_amount">
           </div>
 
           <div>
@@ -39,12 +49,12 @@
             <label class="form-label">Justificatif (photo ticket / facture)</label>
             <div class="input-group">
               <input type="file" class="form-control" name="receipt" accept="image/*">
-              <button type="button" class="btn btn-outline-secondary" id="scan-receipt-btn">
+              <button type="button" class="btn btn-outline-secondary" id="scan-ticket-btn">
                 Scanner le ticket
               </button>
             </div>
-            <small class="text-muted d-block mt-1">
-              Le scan tente de remplir automatiquement le montant, la date et le libellé.
+            <small class="text-muted">
+              Le scan tente de remplir automatiquement le montant, la date, le HT et la TVA.
             </small>
           </div>
 
@@ -62,37 +72,40 @@
       <div class="card-body">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
           <h2 class="h5 mb-0">
-            {% if is_admin %}Toutes les notes de frais{% else %}Mes notes de frais{% endif %}
+            {% if is_admin %}
+              Toutes les notes de frais
+            {% else %}
+              Mes notes de frais
+            {% endif %}
           </h2>
 
           <div class="d-flex flex-wrap gap-2">
             <input type="date" id="filter-date-from" class="form-control form-control-sm" placeholder="Du">
             <input type="date" id="filter-date-to" class="form-control form-control-sm" placeholder="Au">
             <input type="text" id="filter-chantier" class="form-control form-control-sm" placeholder="Filtrer chantier">
-            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetFilters()">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="reset-filters-btn">
               Réinitialiser
             </button>
           </div>
         </div>
 
         <div class="d-flex justify-content-end mb-2 gap-2">
-          <button type="button" class="btn btn-outline-primary btn-sm" onclick="sortExpenses('date')">
+          <button type="button" class="btn btn-outline-primary btn-sm" id="sort-date-btn">
             Trier par date
           </button>
-          <button type="button" class="btn btn-outline-primary btn-sm" onclick="sortExpenses('amount')">
+          <button type="button" class="btn btn-outline-primary btn-sm" id="sort-amount-btn">
             Trier par montant
           </button>
         </div>
 
         <div class="table-responsive">
-         <table class="table table-sm table-hover align-middle"
-       id="expenses-table"
-       data-is-admin="{{ 'true' if is_admin else 'false' }}">
-
+          <table class="table table-sm table-hover align-middle" id="expenses-table">
             <thead class="table-light">
               <tr>
                 <th>Date</th>
-                <th>Montant</th>
+                <th>Montant TTC</th>
+                <th>Montant HT</th>
+                <th>TVA</th>
                 <th>Libellé</th>
                 <th>Chantier</th>
                 <th>Utilisateur</th>
@@ -105,14 +118,30 @@
             </thead>
             <tbody>
             {% for e in expenses %}
-              <tr>
-                <td data-date="{{ e.date }}">{{ e.date }}</td>
-                <td data-amount="{{ e.amount }}">{{ '%.2f'|format(e.amount) }} €</td>
+              <tr
+                data-date="{{ e.date }}"
+                data-amount="{{ e.amount }}"
+                data-chantier="{{ e.chantier | lower }}"
+              >
+                <td>{{ e.date }}</td>
+                <td>{{ '%.2f'|format(e.amount) }} €</td>
+                <td>
+                  {% if e.amount_ht is not none %}
+                    {{ '%.2f'|format(e.amount_ht) }} €
+                  {% else %}
+                    <span class="text-muted">-</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if e.tva_amount is not none %}
+                    {{ '%.2f'|format(e.tva_amount) }} €
+                  {% else %}
+                    <span class="text-muted">-</span>
+                  {% endif %}
+                </td>
                 <td>{{ e.label }}</td>
                 <td class="chantier-cell">{{ e.chantier }}</td>
                 <td>{{ e.user_email }}</td>
-
-                <!-- STATUT -->
                 <td>
                   {% if e.status == 'approved' %}
                     <span class="badge bg-success">Validée</span>
@@ -121,17 +150,7 @@
                   {% else %}
                     <span class="badge bg-secondary">En attente</span>
                   {% endif %}
-
-                  {% if e.validated_by %}
-                    <br>
-                    <small class="text-muted">
-                      par {{ e.validated_by }}
-                      {% if e.validated_at %} le {{ e.validated_at[:10] }}{% endif %}
-                    </small>
-                  {% endif %}
                 </td>
-
-                <!-- JUSTIFICATIF -->
                 <td>
                   {% if e.receipt_path %}
                     {% if e.receipt_path.startswith('http') %}
@@ -147,28 +166,21 @@
                     <span class="text-muted">-</span>
                   {% endif %}
                 </td>
-
-                <!-- ACTIONS ADMIN -->
                 {% if is_admin %}
-                <td>
-                  <div class="d-flex flex-wrap gap-1">
-                    {% if e.status != 'approved' %}
-                    <form method="post" action="{{ url_for('approve_expense', expense_id=e.id) }}">
-                      <button type="submit" class="btn btn-success btn-sm">
-                        Valider
+                  <td>
+                    <form method="post" action="{{ url_for('approve_expense', expense_id=e.id) }}" class="d-inline">
+                      <button type="submit" class="btn btn-success btn-sm"
+                              {% if e.status == 'approved' %}disabled{% endif %}>
+                        ✓
                       </button>
                     </form>
-                    {% endif %}
-
-                    {% if e.status != 'rejected' %}
-                    <form method="post" action="{{ url_for('reject_expense', expense_id=e.id) }}">
-                      <button type="submit" class="btn btn-outline-danger btn-sm">
-                        Refuser
+                    <form method="post" action="{{ url_for('reject_expense', expense_id=e.id) }}" class="d-inline ms-1">
+                      <button type="submit" class="btn btn-outline-danger btn-sm"
+                              {% if e.status == 'rejected' %}disabled{% endif %}>
+                        ✕
                       </button>
                     </form>
-                    {% endif %}
-                  </div>
-                </td>
+                  </td>
                 {% endif %}
               </tr>
             {% endfor %}

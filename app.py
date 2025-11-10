@@ -77,6 +77,7 @@ def get_db():
     )
     return conn
 
+
 def init_db():
     conn = get_db()
     cur = conn.cursor()
@@ -93,12 +94,14 @@ def init_db():
         );
     """)
 
-    # Table expenses (avec status + validation)
+    # Table expenses (avec status + validation + HT/TVA)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS expenses (
             id SERIAL PRIMARY KEY,
             user_email TEXT NOT NULL,
             amount NUMERIC(10,2) NOT NULL,
+            amount_ht NUMERIC(10,2),
+            tva_amount NUMERIC(10,2),
             date DATE NOT NULL,
             label TEXT NOT NULL,
             chantier TEXT NOT NULL,
@@ -110,8 +113,22 @@ def init_db():
         );
     """)
 
+    # Ajout des colonnes HT / TVA si base déjà existante
+    cur.execute("""
+        ALTER TABLE expenses
+        ADD COLUMN IF NOT EXISTS amount_ht NUMERIC(10,2);
+    """)
+    cur.execute("""
+        ALTER TABLE expenses
+        ADD COLUMN IF NOT EXISTS tva_amount NUMERIC(10,2);
+    """)
+
     conn.commit()
     conn.close()
+
+
+# IMPORTANT : on initialise la DB au chargement du module
+init_db()
 
 
 def sync_users_from_csv():
@@ -119,7 +136,7 @@ def sync_users_from_csv():
     Lit users.csv et synchronise dans la table users.
     - crée les utilisateurs manquants
     - met à jour prénom/nom si besoin
-    - NE réécrit PAS les mots de passe existants (pour ne pas écraser si on les change plus tard)
+    - NE réécrit PAS les mots de passe existants
     """
     csv_path = os.path.join(BASE_DIR, "users.csv")
     if not os.path.exists(csv_path):
@@ -170,8 +187,7 @@ def sync_users_from_csv():
     print("Synchronisation des utilisateurs depuis users.csv terminée.")
 
 
-# 👉 IMPORTANT : on initialise la DB **et** on synchronise les users
-init_db()
+# synchro au chargement
 sync_users_from_csv()
 
 # -----------------------------------------------------------------------------#
@@ -288,6 +304,8 @@ def expenses():
     if request.method == "POST":
         # Récupération des champs du formulaire
         amount = request.form.get("amount")
+        amount_ht_str = request.form.get("amount_ht") or ""
+        tva_amount_str = request.form.get("tva_amount") or ""
         date_str = request.form.get("date")
         label = request.form.get("label")
         chantier = request.form.get("chantier")
@@ -297,10 +315,12 @@ def expenses():
             flash("Tous les champs marqués * sont obligatoires.", "danger")
         else:
             try:
-                amount_val = float(amount)
+                amount_val = float(amount.replace(",", "."))
                 datetime.strptime(date_str, "%Y-%m-%d")
+                amount_ht_val = float(amount_ht_str.replace(",", ".")) if amount_ht_str else None
+                tva_amount_val = float(tva_amount_str.replace(",", ".")) if tva_amount_str else None
             except ValueError:
-                flash("Montant ou date invalide.", "danger")
+                flash("Montants ou date invalides.", "danger")
                 conn.close()
                 return redirect(url_for("expenses"))
 
@@ -312,13 +332,17 @@ def expenses():
             cur.execute(
                 """
                 INSERT INTO expenses
-                    (user_email, amount, date, label, chantier, receipt_path, created_at)
+                    (user_email, amount, amount_ht, tva_amount,
+                     date, label, chantier, receipt_path, created_at)
                 VALUES
-                    (%s, %s, %s, %s, %s, %s, %s)
+                    (%s, %s, %s, %s,
+                     %s, %s, %s, %s, %s)
                 """,
                 (
                     current_user,
                     amount_val,
+                    amount_ht_val,
+                    tva_amount_val,
                     date_str,
                     label,
                     chantier,
@@ -337,7 +361,8 @@ def expenses():
         # Admin : voit toutes les notes
         cur.execute(
             """
-            SELECT id, user_email, amount, date, label, chantier,
+            SELECT id, user_email, amount, amount_ht, tva_amount,
+                   date, label, chantier,
                    receipt_path, created_at, status, validated_by, validated_at
             FROM expenses
             ORDER BY date DESC, id DESC
@@ -347,7 +372,8 @@ def expenses():
         # Utilisateur normal : ne voit que ses propres notes
         cur.execute(
             """
-            SELECT id, user_email, amount, date, label, chantier,
+            SELECT id, user_email, amount, amount_ht, tva_amount,
+                   date, label, chantier,
                    receipt_path, created_at, status, validated_by, validated_at
             FROM expenses
             WHERE user_email = %s
@@ -365,14 +391,16 @@ def expenses():
             "id": r[0],
             "user_email": r[1],
             "amount": float(r[2]),
-            "date": r[3].strftime("%Y-%m-%d"),
-            "label": r[4],
-            "chantier": r[5],
-            "receipt_path": r[6],
-            "created_at": r[7].isoformat(),
-            "status": r[8],
-            "validated_by": r[9],
-            "validated_at": r[10].isoformat() if r[10] else None,
+            "amount_ht": float(r[3]) if r[3] is not None else None,
+            "tva_amount": float(r[4]) if r[4] is not None else None,
+            "date": r[5].strftime("%Y-%m-%d"),
+            "label": r[6],
+            "chantier": r[7],
+            "receipt_path": r[8],
+            "created_at": r[9].isoformat(),
+            "status": r[10],
+            "validated_by": r[11],
+            "validated_at": r[12].isoformat() if r[12] else None,
         })
 
     return render_template(
@@ -397,7 +425,8 @@ def api_expenses():
     if is_admin():
         cur.execute(
             """
-            SELECT id, user_email, amount, date, label, chantier,
+            SELECT id, user_email, amount, amount_ht, tva_amount,
+                   date, label, chantier,
                    receipt_path, created_at, status, validated_by, validated_at
             FROM expenses
             ORDER BY date DESC, id DESC
@@ -406,7 +435,8 @@ def api_expenses():
     else:
         cur.execute(
             """
-            SELECT id, user_email, amount, date, label, chantier,
+            SELECT id, user_email, amount, amount_ht, tva_amount,
+                   date, label, chantier,
                    receipt_path, created_at, status, validated_by, validated_at
             FROM expenses
             WHERE user_email = %s
@@ -424,14 +454,16 @@ def api_expenses():
             "id": r[0],
             "user_email": r[1],
             "amount": float(r[2]),
-            "date": r[3].strftime("%Y-%m-%d"),
-            "label": r[4],
-            "chantier": r[5],
-            "receipt_path": r[6],
-            "created_at": r[7].isoformat(),
-            "status": r[8],
-            "validated_by": r[9],
-            "validated_at": r[10].isoformat() if r[10] else None,
+            "amount_ht": float(r[3]) if r[3] is not None else None,
+            "tva_amount": float(r[4]) if r[4] is not None else None,
+            "date": r[5].strftime("%Y-%m-%d"),
+            "label": r[6],
+            "chantier": r[7],
+            "receipt_path": r[8],
+            "created_at": r[9].isoformat(),
+            "status": r[10],
+            "validated_by": r[11],
+            "validated_at": r[12].isoformat() if r[12] else None,
         })
     return jsonify(data)
 
@@ -442,17 +474,37 @@ def api_expenses():
 def extract_amount(text: str):
     if not text:
         return None
-    # remplace les virgules par des points pour simplifier
     cleaned = text.replace(",", ".")
-    # cherche des montants avec 2 décimales
+    # On prend le DERNIER montant avec 2 décimales → souvent le total TTC
     matches = re.findall(r"(\d+\.\d{2})", cleaned)
     if matches:
         return matches[-1]
-    # à défaut, cherche un entier
     matches = re.findall(r"(\d+)", cleaned)
     if matches:
         return matches[-1]
     return None
+
+
+def extract_ht_tva(text: str):
+    if not text:
+        return None, None
+
+    cleaned = text.replace(",", ".")
+
+    ht_amount = None
+    tva_amount = None
+
+    # H.T. / HT
+    m_ht = re.search(r"(?:H\.?T\.?|HT)[^0-9]*(\d+\.\d{2})", cleaned, re.IGNORECASE)
+    if m_ht:
+        ht_amount = m_ht.group(1)
+
+    # TVA
+    m_tva = re.search(r"TVA[^0-9]*(\d+\.\d{2})", cleaned, re.IGNORECASE)
+    if m_tva:
+        tva_amount = m_tva.group(1)
+
+    return ht_amount, tva_amount
 
 
 def extract_date(text: str):
@@ -537,6 +589,7 @@ def scan_receipt():
     text = " ".join(r.get("ParsedText", "") for r in parsed_results) or ""
 
     amount = extract_amount(text)
+    amount_ht, tva_amount = extract_ht_tva(text)
     date_str = extract_date(text)
     label_guess = text.strip().replace("\n", " ")[:80] if text else ""
 
@@ -549,6 +602,8 @@ def scan_receipt():
 
     return jsonify({
         "amount": amount,
+        "amount_ht": amount_ht,
+        "tva_amount": tva_amount,
         "date": date_str,
         "label": label_guess,
         "raw_text": text,
@@ -570,7 +625,8 @@ def generate_monthly_report(year: int, month: int):
 
     cur.execute(
         """
-        SELECT user_email, amount, date, label, chantier, receipt_path
+        SELECT user_email, amount, amount_ht, tva_amount,
+               date, label, chantier, receipt_path
         FROM expenses
         WHERE date >= %s AND date < %s
         ORDER BY date ASC
@@ -585,10 +641,12 @@ def generate_monthly_report(year: int, month: int):
         result.append({
             "user_email": r[0],
             "amount": float(r[1]),
-            "date": r[2].strftime("%Y-%m-%d"),
-            "label": r[3],
-            "chantier": r[4],
-            "receipt_path": r[5],
+            "amount_ht": float(r[2]) if r[2] is not None else None,
+            "tva_amount": float(r[3]) if r[3] is not None else None,
+            "date": r[4].strftime("%Y-%m-%d"),
+            "label": r[5],
+            "chantier": r[6],
+            "receipt_path": r[7],
         })
     return result
 
@@ -598,11 +656,16 @@ def format_report_csv(rows):
     import csv as csv_module
     output = io.StringIO()
     writer = csv_module.writer(output, delimiter=";")
-    writer.writerow(["Date", "Montant", "Libellé", "Chantier", "Utilisateur", "Justificatif"])
+    writer.writerow([
+        "Date", "Montant TTC", "Montant HT", "TVA",
+        "Libellé", "Chantier", "Utilisateur", "Justificatif"
+    ])
     for r in rows:
         writer.writerow([
             r["date"],
             r["amount"],
+            r["amount_ht"] if r["amount_ht"] is not None else "",
+            r["tva_amount"] if r["tva_amount"] is not None else "",
             r["label"],
             r["chantier"],
             r["user_email"],
@@ -678,9 +741,9 @@ def cli_send_report_cron():
 def admin_export():
     """
     Export CSV des notes de frais pour un mois donné.
-    Paramètres GET :
-      - year (obligatoire)
-      - month (obligatoire)
+    GET :
+      - year
+      - month
     Ex: /admin/export?year=2025&month=11
     """
     try:
