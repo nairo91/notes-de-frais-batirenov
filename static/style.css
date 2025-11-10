@@ -1,0 +1,22 @@
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.navbar-brand {
+    font-size: 1.05rem;
+}
+
+/* Cartes un peu plus jolies */
+.card {
+    border-radius: 0.75rem;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+.table-sm td,
+.table-sm th {
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
+}

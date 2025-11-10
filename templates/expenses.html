@@ -1,78 +1,122 @@
-<!doctype html>
-<html lang="fr">
-<head>
-    <meta charset="utf-8">
-    <title>Notes de frais</title>
-    <script src="{{ url_for('static', filename='main.js') }}"></script>
-</head>
-<body>
-    <h1>Notes de frais</h1>
-    <p>Bonjour {{ user_name }} | <a href="{{ url_for('logout') }}">Se déconnecter</a></p>
+{% extends "base.html" %}
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <ul>
-        {% for category, msg in messages %}
-          <li style="color:{% if category == 'error' %}red{% else %}green{% endif %};">
-            {{ msg }}
-          </li>
-        {% endfor %}
-        </ul>
-      {% endif %}
-    {% endwith %}
+{% block title %}Notes de frais{% endblock %}
 
-    <h2>Nouvelle note de frais</h2>
-    <form method="post" enctype="multipart/form-data">
-        <label>Montant (€) *</label><br>
-        <input type="number" step="0.01" name="amount" required><br><br>
+{% block content %}
+<div class="row g-4">
 
-        <label>Date *</label><br>
-        <input type="date" name="date" required><br><br>
+  <!-- Colonne formulaire -->
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h5 mb-3">Nouvelle note de frais</h2>
+        <p class="text-muted small">
+          Champs marqués * obligatoires.
+        </p>
 
-        <label>Libellé *</label><br>
-        <input type="text" name="label" required><br><br>
+        <form method="post" enctype="multipart/form-data" class="vstack gap-3">
+          <div>
+            <label class="form-label">Montant (€) *</label>
+            <input type="number" step="0.01" min="0" class="form-control" name="amount" required>
+          </div>
 
-        <label>Chantier *</label><br>
-        <input type="text" name="chantier" required><br><br>
+          <div>
+            <label class="form-label">Date *</label>
+            <input type="date" class="form-control" name="date" required>
+          </div>
 
-        <label>Justificatif (photo ticket / facture)</label><br>
-        <input type="file" name="receipt" accept="image/*"><br><br>
+          <div>
+            <label class="form-label">Libellé *</label>
+            <input type="text" class="form-control" name="label" placeholder="Ex: Déjeuner client" required>
+          </div>
 
-        <button type="submit">Enregistrer</button>
-    </form>
+          <div>
+            <label class="form-label">Chantier *</label>
+            <input type="text" class="form-control" name="chantier" placeholder="Ex: Chantier Dupont" required>
+          </div>
 
-    <h2>Liste des notes de frais</h2>
-    <button type="button" onclick="loadExpenses('date')">Trier par date (client)</button>
+          <div>
+            <label class="form-label">Justificatif (photo ticket / facture)</label>
+            <input type="file" class="form-control" name="receipt" accept="image/*">
+          </div>
 
-    <table border="1" id="expenses-table">
-        <thead>
-            <tr>
+          <button type="submit" class="btn btn-success w-100">
+            Enregistrer la note
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Colonne tableau -->
+  <div class="col-lg-8">
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+          <h2 class="h5 mb-0">Mes notes de frais</h2>
+
+          <div class="d-flex flex-wrap gap-2">
+            <input type="date" id="filter-date-from" class="form-control form-control-sm" placeholder="Du">
+            <input type="date" id="filter-date-to" class="form-control form-control-sm" placeholder="Au">
+            <input type="text" id="filter-chantier" class="form-control form-control-sm" placeholder="Filtrer chantier">
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetFilters()">
+              Réinitialiser
+            </button>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-end mb-2 gap-2">
+          <button type="button" class="btn btn-outline-primary btn-sm" onclick="sortExpenses('date')">
+            Trier par date
+          </button>
+          <button type="button" class="btn btn-outline-primary btn-sm" onclick="sortExpenses('amount')">
+            Trier par montant
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle" id="expenses-table">
+            <thead class="table-light">
+              <tr>
                 <th>Date</th>
                 <th>Montant</th>
                 <th>Libellé</th>
                 <th>Chantier</th>
                 <th>Utilisateur</th>
                 <th>Justificatif</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for e in expenses %}
-            <tr>
-                <td>{{ e.date }}</td>
-                <td>{{ '%.2f'|format(e.amount) }}</td>
+              </tr>
+            </thead>
+            <tbody>
+            {% for e in expenses %}
+              <tr>
+                <td data-date="{{ e.date }}">{{ e.date }}</td>
+                <td data-amount="{{ e.amount }}">{{ '%.2f'|format(e.amount) }} €</td>
                 <td>{{ e.label }}</td>
-                <td>{{ e.chantier }}</td>
+                <td class="chantier-cell">{{ e.chantier }}</td>
                 <td>{{ e.user_email }}</td>
                 <td>
-                    {% if e.receipt_path %}
-                        <a href="{{ url_for('uploaded_file', filename=e.receipt_path) }}" target="_blank">Voir</a>
-                    {% else %}
-                        -
-                    {% endif %}
+                  {% if e.receipt_path %}
+                    <a href="{{ url_for('uploaded_file', filename=e.receipt_path) }}" target="_blank" class="btn btn-link btn-sm">
+                      Voir
+                    </a>
+                  {% else %}
+                    <span class="text-muted">-</span>
+                  {% endif %}
                 </td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-</body>
-</html>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {% if not expenses %}
+          <p class="text-muted text-center mb-0">
+            Aucune note de frais enregistrée pour le moment.
+          </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -7,27 +7,37 @@ from flask import (
     session, send_from_directory, jsonify, flash
 )
 from werkzeug.utils import secure_filename
+from functools import wraps
 
+# -----------------------------------------------------------------------------
+# CONFIG FLASK
+# -----------------------------------------------------------------------------
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-me-in-env")
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
-# Uploads
+# Dossier d'upload des justificatifs
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-# Database (PostgreSQL via DATABASE_URL env var)
+# -----------------------------------------------------------------------------
+# CONFIG BASE DE DONNÉES (PostgreSQL)
+# -----------------------------------------------------------------------------
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def get_db():
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL is not set")
-    conn = psycopg2.connect(DATABASE_URL, sslmode=os.environ.get("DB_SSLMODE", "require"))
+    conn = psycopg2.connect(
+        DATABASE_URL,
+        sslmode=os.environ.get("DB_SSLMODE", "require")
+    )
     return conn
 
 def init_db():
+    """Crée la table expenses si elle n'existe pas."""
     conn = get_db()
     cur = conn.cursor()
     cur.execute("""
@@ -45,13 +55,18 @@ def init_db():
     conn.commit()
     conn.close()
 
+# IMPORTANT : on initialise la DB au chargement du module
 init_db()
-# Auth via CSV
+
+# -----------------------------------------------------------------------------
+# AUTH : CHARGEMENT DES UTILISATEURS VIA CSV
+# -----------------------------------------------------------------------------
 USERS = {}  # email -> {password, nom, prenom}
 
 def load_users_from_csv():
     csv_path = os.path.join(BASE_DIR, "users.csv")
     if not os.path.exists(csv_path):
+        print("⚠️ users.csv introuvable : pas de login possible.")
         return
     with open(csv_path, encoding="latin-1") as f:
         reader = csv.DictReader(f, delimiter=";")
@@ -67,8 +82,6 @@ def load_users_from_csv():
 
 load_users_from_csv()
 
-from functools import wraps
-
 def login_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -77,6 +90,9 @@ def login_required(f):
         return f(*args, **kwargs)
     return wrapper
 
+# -----------------------------------------------------------------------------
+# ROUTES AUTH
+# -----------------------------------------------------------------------------
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -85,10 +101,12 @@ def login():
         user = USERS.get(email)
         if user and user["password"] == password:
             session["user_email"] = email
-            session["user_name"] = f'{user["prenom"]} {user["nom"]}'.strip() or email
+            session["user_name"] = (
+                f'{user["prenom"]} {user["nom"]}'.strip() or email
+            )
             return redirect(url_for("expenses"))
         else:
-            flash("Email ou mot de passe incorrect", "error")
+            flash("Email ou mot de passe incorrect", "danger")
     return render_template("login.html")
 
 @app.route("/logout")
@@ -102,10 +120,17 @@ def index():
         return redirect(url_for("expenses"))
     return redirect(url_for("login"))
 
+# -----------------------------------------------------------------------------
+# ROUTES FICHIERS UPLOAD
+# -----------------------------------------------------------------------------
 @app.route("/uploads/<filename>")
+@login_required
 def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
+# -----------------------------------------------------------------------------
+# ROUTE PRINCIPALE : NOTES DE FRAIS
+# -----------------------------------------------------------------------------
 @app.route("/expenses", methods=["GET", "POST"])
 @login_required
 def expenses():
@@ -113,21 +138,25 @@ def expenses():
     cur = conn.cursor()
 
     if request.method == "POST":
+        # Récupération des champs du formulaire
         amount = request.form.get("amount")
         date_str = request.form.get("date")
         label = request.form.get("label")
         chantier = request.form.get("chantier")
 
+        # Validation basique
         if not all([amount, date_str, label, chantier]):
-            flash("Tous les champs sont obligatoires", "error")
+            flash("Tous les champs marqués * sont obligatoires.", "danger")
         else:
             try:
                 amount_val = float(amount)
                 datetime.strptime(date_str, "%Y-%m-%d")
             except ValueError:
-                flash("Montant ou date invalide", "error")
+                flash("Montant ou date invalide.", "danger")
+                conn.close()
                 return redirect(url_for("expenses"))
 
+            # Gestion du fichier justificatif
             file = request.files.get("receipt")
             receipt_path = None
             if file and file.filename:
@@ -137,8 +166,12 @@ def expenses():
                 receipt_path = filename
 
             cur.execute(
-                "INSERT INTO expenses (user_email, amount, date, label, chantier, receipt_path, created_at) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                """
+                INSERT INTO expenses
+                    (user_email, amount, date, label, chantier, receipt_path, created_at)
+                VALUES
+                    (%s, %s, %s, %s, %s, %s, %s)
+                """,
                 (
                     session["user_email"],
                     amount_val,
@@ -150,13 +183,19 @@ def expenses():
                 )
             )
             conn.commit()
-            flash("Note de frais ajoutée", "success")
+            flash("Note de frais ajoutée avec succès ✅", "success")
 
+        conn.close()
         return redirect(url_for("expenses"))
 
+    # ----------- PARTIE LECTURE / AFFICHAGE -----------
+    # On récupère tous les frais pour le tableau (triés par date décroissante)
     cur.execute(
-        "SELECT id, user_email, amount, date, label, chantier, receipt_path, created_at "
-        "FROM expenses ORDER BY date DESC"
+        """
+        SELECT id, user_email, amount, date, label, chantier, receipt_path, created_at
+        FROM expenses
+        ORDER BY date DESC, id DESC
+        """
     )
     rows = cur.fetchall()
     conn.close()
@@ -174,15 +213,27 @@ def expenses():
             "created_at": r[7].isoformat(),
         })
 
-    return render_template("expenses.html", expenses=expenses_data, user_name=session.get("user_name"))
+    return render_template(
+        "expenses.html",
+        expenses=expenses_data,
+        user_name=session.get("user_name"),
+        user_email=session.get("user_email"),
+    )
 
+# -----------------------------------------------------------------------------
+# API JSON pour le tableau (utilisée par main.js pour filtrer/tri côté client)
+# -----------------------------------------------------------------------------
 @app.route("/api/expenses")
 @login_required
 def api_expenses():
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
-        "SELECT id, user_email, amount, date, label, chantier, receipt_path, created_at FROM expenses"
+        """
+        SELECT id, user_email, amount, date, label, chantier, receipt_path, created_at
+        FROM expenses
+        ORDER BY date DESC, id DESC
+        """
     )
     rows = cur.fetchall()
     conn.close()
@@ -201,6 +252,9 @@ def api_expenses():
         })
     return jsonify(data)
 
+# -----------------------------------------------------------------------------
+# GÉNÉRATION DU RÉCAP MENSUEL + ENVOI MAIL
+# -----------------------------------------------------------------------------
 def generate_monthly_report(year: int, month: int):
     conn = get_db()
     cur = conn.cursor()
@@ -212,8 +266,12 @@ def generate_monthly_report(year: int, month: int):
         end = date(year, month + 1, 1)
 
     cur.execute(
-        "SELECT user_email, amount, date, label, chantier, receipt_path "
-        "FROM expenses WHERE date >= %s AND date < %s ORDER BY date ASC",
+        """
+        SELECT user_email, amount, date, label, chantier, receipt_path
+        FROM expenses
+        WHERE date >= %s AND date < %s
+        ORDER BY date ASC
+        """,
         (start, end)
     )
     rows = cur.fetchall()
@@ -289,24 +347,26 @@ def send_report_email(year: int, month: int):
 
 @app.route("/admin/send_report_now")
 def admin_send_report_now():
+    """Route pour tester manuellement l'envoi du rapport."""
     today = date.today()
     month = today.month - 1 or 12
     year = today.year if today.month > 1 else today.year - 1
-    init_db()
     send_report_email(year, month)
     return "OK"
 
 def cli_send_report_cron():
+    """Fonction appelée par le cron Render (python app.py send_report_cron)."""
     today = date.today()
     month = today.month - 1 or 12
     year = today.year if today.month > 1 else today.year - 1
-    init_db()
     send_report_email(year, month)
 
+# -----------------------------------------------------------------------------
+# MAIN
+# -----------------------------------------------------------------------------
 if __name__ == "__main__":
     import sys
     if len(sys.argv) > 1 and sys.argv[1] == "send_report_cron":
         cli_send_report_cron()
     else:
-        init_db()
         app.run(debug=True, host="0.0.0.0", port=5000)
