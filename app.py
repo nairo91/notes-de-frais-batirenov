@@ -380,13 +380,31 @@ def scan_receipt():
     except Exception as e:
         return jsonify({"error": f"Erreur OCR: {e}"}), 500
 
-    text = ""
-    if data.get("ParsedResults"):
-        text = " ".join(r.get("ParsedText", "") for r in data["ParsedResults"])
+    # Si l'API indique une erreur
+    if data.get("IsErroredOnProcessing"):
+        msg_list = data.get("ErrorMessage") or []
+        if isinstance(msg_list, list):
+            msg = " ".join(msg_list)
+        else:
+            msg = str(msg_list)
+        return jsonify({"error": f"OCR: {msg}"}), 500
+
+    parsed_results = data.get("ParsedResults")
+    if not parsed_results:
+        return jsonify({"error": "OCR n'a pas réussi à lire le ticket."}), 500
+
+    text = " ".join(r.get("ParsedText", "") for r in parsed_results) or ""
 
     amount = extract_amount(text)
     date_str = extract_date(text)
-    label_guess = (text or "").strip().replace("\n", " ")[:80]
+    label_guess = text.strip().replace("\n", " ")[:80] if text else ""
+
+    # Si vraiment rien n'a été trouvé, on renvoie quand même le texte brut pour debug
+    if not amount and not date_str and not label_guess:
+        return jsonify({
+            "error": "Le ticket a été lu mais aucun montant ou date n'ont été détectés.",
+            "raw_text": text,
+        }), 500
 
     return jsonify({
         "amount": amount,

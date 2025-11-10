@@ -105,25 +105,42 @@ async function scanTicket() {
 
         const data = await res.json();
 
-        if (!res.ok) {
+        // Si le backend a renvoyé une erreur ou un message explicite
+        if (!res.ok || data.error) {
             console.error("Erreur OCR:", data);
             alert(data.error || "Erreur lors du scan du ticket.");
-        } else {
-            if (data.amount) {
-                const amountInput = document.querySelector("input[name='amount']");
-                if (amountInput) amountInput.value = data.amount;
-            }
-            if (data.date) {
-                const dateInput = document.querySelector("input[name='date']");
-                if (dateInput) dateInput.value = data.date;
-            }
-            if (data.label) {
-                const labelInput = document.querySelector("input[name='label']");
-                if (labelInput && !labelInput.value) {
-                    labelInput.value = data.label;
-                }
+            return;
+        }
+
+        let changed = false;
+
+        if (data.amount) {
+            const amountInput = document.querySelector("input[name='amount']");
+            if (amountInput) {
+                amountInput.value = data.amount;
+                changed = true;
             }
         }
+        if (data.date) {
+            const dateInput = document.querySelector("input[name='date']");
+            if (dateInput) {
+                dateInput.value = data.date;
+                changed = true;
+            }
+        }
+        if (data.label) {
+            const labelInput = document.querySelector("input[name='label']");
+            if (labelInput && !labelInput.value) {
+                labelInput.value = data.label;
+                changed = true;
+            }
+        }
+
+        if (!changed) {
+            alert("Le ticket a été lu, mais aucun montant ou date n'ont été détectés.");
+            console.log("Texte OCR brut :", data.raw_text);
+        }
+
     } catch (err) {
         console.error("Erreur scanTicket:", err);
         alert("Impossible de scanner le ticket pour le moment.");
@@ -132,6 +149,7 @@ async function scanTicket() {
         btns.forEach(b => b.disabled = false);
     }
 }
+
 
 document.addEventListener("DOMContentLoaded", () => {
     const table = document.getElementById("expenses-table");
