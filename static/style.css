@@ -214,17 +214,28 @@ body.gradient-bg {
     overflow: hidden;
 }
 
-.table thead {
-    background: rgba(255, 255, 255, 0.12);
-    color: #fff;
+.table thead,
+.table thead.table-light {
+    background: rgba(127, 76, 230, 0.2);
+    color: #ffffff;
 }
 
 .table tbody tr {
     border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.table tbody tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .table tbody tr:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(181, 158, 255, 0.18);
+}
+
+.table tbody td,
+.table tbody th {
+    color: #f7f4ff;
 }
 
 .table-sm td,
