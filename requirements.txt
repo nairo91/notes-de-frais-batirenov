@@ -1,8 +1,8 @@
 Flask==3.0.0
 python-dotenv==1.0.1
 psycopg2-binary==2.9.9
-gunicorn==21.2.0
+gunicorn==22.0.0
 cloudinary==1.41.0
-requests==2.32.3
+requests==2.32.4
 Pillow==11.0.0
 
