@@ -184,15 +184,30 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(1) brightness(1.8); /* rend l’icône claire */
   cursor: pointer;
 }
-
-/* On le fait aussi spécifiquement pour tes deux filtres, au cas où */
+/* Cacher complètement l’icône native si elle pose problème */
 #filter-date-from::-webkit-calendar-picker-indicator,
 #filter-date-to::-webkit-calendar-picker-indicator {
-  filter: invert(1) brightness(1.8);
+  display: none;
 }
 
-/* Optionnel : un peu plus de place à droite pour l’icône */
-#filter-date-from,
-#filter-date-to {
-  padding-right: 2rem;
+/* Faire un petit "input + bouton" bien propre */
+.date-filter-group {
+  position: relative;
+}
+
+.date-filter-group input[type="date"] {
+  padding-right: 2.4rem; /* pour laisser la place au bouton */
+}
+
+.date-filter-btn {
+  position: absolute;
+  top: 50%;
+  right: 0.4rem;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: #f8f5ff;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0;
 }
