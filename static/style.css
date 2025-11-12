@@ -171,3 +171,28 @@ input::placeholder {
 #expenses-table a.btn-link:hover {
   color: #d2bfff !important;
 }
+
+/* ===== Icônes de calendrier sur les champs date (filtres) ===== */
+
+/* Style général pour tous les <input type="date"> */
+input[type="date"] {
+  color-scheme: dark; /* aide certains navigateurs à adapter l'icône */
+}
+
+/* Cible l’icône du datepicker sur Chrome/Edge/Brave (WebKit) */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.8); /* rend l’icône claire */
+  cursor: pointer;
+}
+
+/* On le fait aussi spécifiquement pour tes deux filtres, au cas où */
+#filter-date-from::-webkit-calendar-picker-indicator,
+#filter-date-to::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.8);
+}
+
+/* Optionnel : un peu plus de place à droite pour l’icône */
+#filter-date-from,
+#filter-date-to {
+  padding-right: 2rem;
+}
