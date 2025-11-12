@@ -17,10 +17,14 @@
           <small class="text-muted">Champs marqués * obligatoires.</small>
         </div>
 
-        <!-- Logo entreprise dans le panneau formulaire -->
-        <div class="br-logo-placeholder d-none d-sm-flex">
-          LOGO
-        </div>
+              <!-- Remplace le bouton LOGO par ceci -->
+        <a href="{{ url_for('expenses') }}" class="app-logo d-inline-flex align-items-center gap-2 text-decoration-none">
+          <img src="{{ url_for('static', filename='img/logo.svg') }}"
+              alt="BATI RENOV"
+              class="logo-img" />
+          <span class="logo-text">BATI RENOV</span>
+        </a>
+          
       </div>
 
       <div class="card-body">
