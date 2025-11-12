@@ -7,27 +7,39 @@
 
   <!-- Colonne formulaire -->
   <div class="col-lg-4">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h2 class="h5 mb-3">Nouvelle note de frais</h2>
-        <p class="text-muted small">
-          Champs marqués * obligatoires.
-        </p>
+    <div class="card br-card-glass h-100">
+      <div class="card-header br-card-header d-flex justify-content-between align-items-center">
+        <div>
+          <div class="br-pill mb-1">
+            Nouvelle note
+          </div>
+          <h2 class="h5 mb-0 text-white">Saisir une note de frais</h2>
+          <small class="text-muted">Champs marqués * obligatoires.</small>
+        </div>
 
+        <!-- Logo entreprise dans le panneau formulaire -->
+        <div class="br-logo-placeholder d-none d-sm-flex">
+          LOGO
+        </div>
+      </div>
+
+      <div class="card-body">
         <form method="post" enctype="multipart/form-data" class="vstack gap-3">
+
           <div>
             <label class="form-label">Montant TTC (€) *</label>
             <input type="number" step="0.01" min="0" class="form-control" name="amount" required>
           </div>
 
-          <div>
-            <label class="form-label">Montant HT (€)</label>
-            <input type="number" step="0.01" min="0" class="form-control" name="amount_ht">
-          </div>
-
-          <div>
-            <label class="form-label">TVA (€)</label>
-            <input type="number" step="0.01" min="0" class="form-control" name="tva_amount">
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label">Montant HT (€)</label>
+              <input type="number" step="0.01" min="0" class="form-control" name="amount_ht">
+            </div>
+            <div class="col-6">
+              <label class="form-label">TVA (€)</label>
+              <input type="number" step="0.01" min="0" class="form-control" name="tva_amount">
+            </div>
           </div>
 
           <div>
@@ -49,7 +61,7 @@
             <label class="form-label">Justificatif (photo ticket / facture)</label>
             <div class="input-group">
               <input type="file" class="form-control" name="receipt" accept="image/*">
-              <button type="button" class="btn btn-outline-secondary" id="scan-ticket-btn">
+              <button type="button" class="btn btn-outline-primary" id="scan-ticket-btn">
                 Scanner le ticket
               </button>
             </div>
@@ -58,7 +70,7 @@
             </small>
           </div>
 
-          <button type="submit" class="btn btn-success w-100">
+          <button type="submit" class="btn btn-success w-100 mt-2">
             Enregistrer la note
           </button>
         </form>
@@ -68,28 +80,40 @@
 
   <!-- Colonne tableau -->
   <div class="col-lg-8">
-    <div class="card shadow-sm mb-3">
-      <div class="card-body">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-          <h2 class="h5 mb-0">
-            {% if is_admin %}
-              Toutes les notes de frais
-            {% else %}
-              Mes notes de frais
-            {% endif %}
-          </h2>
+    <div class="card br-card-glass mb-3">
+      <div class="card-header br-card-header">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <div>
+            <div class="br-pill mb-1">
+              {% if is_admin %}
+                Vue administrateur
+              {% else %}
+                Mes notes
+              {% endif %}
+            </div>
+            <h2 class="h5 mb-0 text-white">
+              {% if is_admin %}
+                Toutes les notes de frais
+              {% else %}
+                Mes notes de frais
+              {% endif %}
+            </h2>
+          </div>
 
           <div class="d-flex flex-wrap gap-2">
             <input type="date" id="filter-date-from" class="form-control form-control-sm" placeholder="Du">
             <input type="date" id="filter-date-to" class="form-control form-control-sm" placeholder="Au">
             <input type="text" id="filter-chantier" class="form-control form-control-sm" placeholder="Filtrer chantier">
-            <button type="button" class="btn btn-outline-secondary btn-sm" id="reset-filters-btn">
+            <button type="button" class="btn btn-outline-primary btn-sm" id="reset-filters-btn">
               Réinitialiser
             </button>
           </div>
         </div>
+      </div>
 
-        <div class="d-flex justify-content-end mb-2 gap-2">
+      <div class="card-body">
+
+        <div class="d-flex justify-content-end mb-3 gap-2">
           <button type="button" class="btn btn-outline-primary btn-sm" id="sort-date-btn">
             Trier par date
           </button>
@@ -100,7 +124,7 @@
 
         <div class="table-responsive">
           <table class="table table-sm table-hover align-middle" id="expenses-table">
-            <thead class="table-light">
+            <thead>
               <tr>
                 <th>Date</th>
                 <th>Montant TTC</th>
@@ -154,11 +178,11 @@
                 <td>
                   {% if e.receipt_path %}
                     {% if e.receipt_path.startswith('http') %}
-                      <a href="{{ e.receipt_path }}" target="_blank" class="btn btn-link btn-sm">
+                      <a href="{{ e.receipt_path }}" target="_blank" class="btn btn-link btn-sm text-decoration-none">
                         Voir
                       </a>
                     {% else %}
-                      <a href="{{ url_for('uploaded_file', filename=e.receipt_path) }}" target="_blank" class="btn btn-link btn-sm">
+                      <a href="{{ url_for('uploaded_file', filename=e.receipt_path) }}" target="_blank" class="btn btn-link btn-sm text-decoration-none">
                         Voir
                       </a>
                     {% endif %}
@@ -198,4 +222,8 @@
   </div>
 
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='main.js') }}"></script>
 {% endblock %}

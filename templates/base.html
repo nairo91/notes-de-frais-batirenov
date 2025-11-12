@@ -1,63 +1,266 @@
 <!doctype html>
 <html lang="fr">
 <head>
-    <meta charset="utf-8">
-    <title>{% block title %}Notes de frais BATI RENOV{% endblock %}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8">
+  <title>{% block title %}BATI RENOV - Notes de frais{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- Bootstrap 5 CDN -->
-    <link
-        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-        rel="stylesheet"
-    >
+  <!-- Bootstrap (via CDN pour simplifier) -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+    integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+    crossorigin="anonymous"
+  >
 
-    <!-- Styles perso -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <style>
+    :root {
+      --br-primary: #5f2cff;
+      --br-primary-dark: #2b0957;
+      --br-primary-mid: #4b1f8f;
+      --br-primary-light: #8d63ff;
+      --br-bg: #0f071f;
+    }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      background: radial-gradient(circle at top left, #6c3cff 0%, #2b0957 40%, #05020a 100%);
+      color: #f8f9ff;
+    }
+
+    .br-navbar {
+      background: linear-gradient(90deg, var(--br-primary-dark), var(--br-primary-mid));
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    .br-navbar-brand {
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: #ffffff !important;
+      font-size: 0.9rem;
+    }
+
+    .br-navbar-logo {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      object-fit: contain;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 4px;
+    }
+
+    .br-shell {
+      min-height: calc(100vh - 64px);
+      padding: 2rem 1rem 3rem;
+    }
+
+    @media (min-width: 992px) {
+      .br-shell {
+        padding: 3rem 2rem 4rem;
+      }
+    }
+
+    .br-card-glass {
+      background: rgba(9, 6, 25, 0.92);
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      box-shadow:
+        0 18px 40px rgba(0, 0, 0, 0.75),
+        0 0 0 1px rgba(255, 255, 255, 0.02);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .br-card-header {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .br-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: rgba(255, 255, 255, 0.08);
+      color: #f1ecff;
+    }
+
+    .br-logo-placeholder {
+      width: 120px;
+      height: 40px;
+      border-radius: 10px;
+      background: linear-gradient(120deg, var(--br-primary-light), var(--br-primary));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      opacity: 0.9;
+    }
+
+    /* Boutons violets */
+    .btn-primary,
+    .btn-success,
+    .btn-outline-primary {
+      border-radius: 999px;
+      border-width: 1px;
+    }
+
+    .btn-primary,
+    .btn-success {
+      border-color: transparent;
+      background-image: linear-gradient(135deg, var(--br-primary), var(--br-primary-light));
+      color: #ffffff;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    }
+
+    .btn-primary:hover,
+    .btn-success:hover {
+      filter: brightness(1.05);
+      transform: translateY(-1px);
+    }
+
+    .btn-outline-primary {
+      color: var(--br-primary-light);
+      border-color: rgba(255, 255, 255, 0.25);
+      background: transparent;
+    }
+
+    .btn-outline-primary:hover {
+      background-image: linear-gradient(135deg, var(--br-primary-dark), var(--br-primary-mid));
+      color: #ffffff;
+      border-color: transparent;
+    }
+
+    /* Inputs */
+    .form-control,
+    .form-select {
+      background: rgba(12, 9, 32, 0.9);
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #f8f9ff;
+    }
+
+    .form-control:focus,
+    .form-select:focus {
+      border-color: var(--br-primary-light);
+      box-shadow: 0 0 0 0.1rem rgba(111, 66, 193, 0.4);
+      background: rgba(15, 11, 40, 0.97);
+      color: #ffffff;
+    }
+
+    .form-label {
+      font-size: 0.85rem;
+      color: rgba(248, 249, 255, 0.9);
+    }
+
+    .table {
+      color: #f8f9ff;
+      font-size: 0.86rem;
+    }
+
+    .table thead {
+      background: linear-gradient(90deg, rgba(95,44,255,0.35), rgba(141,99,255,0.15));
+    }
+
+    .table tbody tr {
+      background: rgba(11, 7, 30, 0.9);
+    }
+
+    .table tbody tr:nth-child(even) {
+      background: rgba(15, 10, 40, 0.95);
+    }
+
+    .badge.bg-success {
+      background: linear-gradient(135deg, #2ecc71, #27ae60);
+    }
+
+    .badge.bg-danger {
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
+    }
+
+    .badge.bg-secondary {
+      background: linear-gradient(135deg, #7f8c8d, #636e72);
+    }
+
+    .br-footer {
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.6);
+    }
+  </style>
+
+  {% block extra_css %}{% endblock %}
 </head>
-<body class="bg-light">
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
-  <div class="container-fluid">
-    <a class="navbar-brand fw-bold" href="{{ url_for('expenses') }}">
-      BATI RENOV - Notes de frais
-    </a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
-            data-bs-target="#navbarNav" aria-controls="navbarNav"
-            aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-
-    <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
-      {% if session.get("user_email") %}
-      <span class="navbar-text me-3 text-white-50">
-        {{ session.get("user_name") }} ({{ session.get("user_email") }})
-      </span>
-      <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm">
-        Déconnexion
+<body>
+  <!-- Barre de navigation -->
+  <nav class="navbar br-navbar navbar-dark">
+    <div class="container-fluid">
+      <a class="navbar-brand br-navbar-brand" href="{{ url_for('expenses') if session.get('user_email') else url_for('login') }}">
+        <!-- Logo principal (remplace src par ton vrai fichier) -->
+        <img
+          src="{{ url_for('static', filename='img/logo-batirenov.png') }}"
+          alt="Logo BATI RENOV"
+          class="br-navbar-logo"
+          onerror="this.style.visibility='hidden';"
+        >
+        <span>BATI RENOV</span>
       </a>
-      {% endif %}
+
+      <div class="d-flex align-items-center gap-3">
+        {% if session.get('user_email') %}
+          <span class="small text-light d-none d-sm-inline">
+            Connecté en tant que <strong>{{ session.get('user_name') or session.get('user_email') }}</strong>
+          </span>
+          <a href="{{ url_for('logout') }}" class="btn btn-outline-light btn-sm rounded-pill">
+            Déconnexion
+          </a>
+        {% endif %}
+      </div>
     </div>
-  </div>
-</nav>
+  </nav>
 
-<div class="container mb-5">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <div class="mb-3">
-        {% for category, msg in messages %}
-          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-            {{ msg }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  <main class="br-shell">
+    <div class="container-fluid">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="mb-3" style="max-width: 800px; margin: 0 auto;">
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show br-card-glass" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Fermer"></button>
+              </div>
+            {% endfor %}
           </div>
-        {% endfor %}
-        </div>
-      {% endif %}
-    {% endwith %}
+        {% endif %}
+      {% endwith %}
 
-    {% block content %}{% endblock %}
-</div>
+      {% block content %}{% endblock %}
+    </div>
+  </main>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="{{ url_for('static', filename='main.js') }}"></script>
+  <footer class="text-center py-3 br-footer">
+    &copy; {{ 2025 }} BATI RENOV – Notes de frais
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+          integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+          crossorigin="anonymous"></script>
+  {% block extra_js %}{% endblock %}
 </body>
 </html>
