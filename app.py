@@ -471,121 +471,79 @@ def api_expenses():
 # OCR : Scan d'un ticket pour pré-remplir la note (TTC / HT / TVA)
 # -----------------------------------------------------------------------------#
 
-def _normalize_number(s: str):
-    """
-    Convertit '10,90' ou '10.90' -> '10.90'.
-    Retourne une chaîne (on laisse le JS convertir en nombre).
-    """
-    if not s:
-        return None
-    s = s.strip()
-    s = s.replace(" ", "").replace("\u00a0", "")  # espaces classiques & insécables
-    s = s.replace(",", ".")
-    m = re.search(r"[-+]?\d+(\.\d+)?", s)
-    return m.group(0) if m else None
-
-
 def parse_amounts_ttc_ht_tva(text: str):
     """
-    Essaie d'extraire TTC, HT et TVA à partir du texte complet OCR.
-    - TTC : cherche une ligne contenant 'TOTAL' puis un montant autour (avant/après).
-    - HT  : cherche une ligne contenant 'H.T', 'HT', 'HORS TAXE(S)' et prend
-            le montant sur une des lignes SUIVANTES.
-    - TVA : pareil avec une ligne contenant 'TVA'.
-    Si une des valeurs manque mais que 2 sur 3 sont trouvées, on recalcule la 3e.
+    Essaie d'extraire TTC, HT et TVA à partir du texte entier du ticket.
+
+    Stratégie:
+      - on extrait tous les montants avec 2 décimales (10,90 / 10.90)
+      - TTC = plus grand montant
+      - HT  = montant associé à un libellé H.T / HT si présent,
+              sinon le plus grand montant strictement inférieur au TTC
+      - TVA = montant associé à un libellé TVA si présent,
+              sinon TTC - HT
+    On renvoie des chaînes '10.90' ou None.
     """
     if not text:
         return {"ttc": None, "ht": None, "tva": None}
 
-    raw_lines = [l for l in text.splitlines()]
-    lines = [l.strip() for l in raw_lines if l.strip()]
+    # Normalisation basique : on remplace les virgules par des points
+    cleaned = text.replace("\u00a0", " ").replace(",", ".")
+    lines = [l.strip() for l in cleaned.splitlines() if l.strip()]
 
-    n = len(lines)
+    # 1) Récupérer tous les montants du ticket
+    all_values = []
+    for line in lines:
+        for m in re.findall(r"\d+\.\d{2}", line):
+            try:
+                all_values.append(float(m))
+            except ValueError:
+                pass
 
-    # --- helpers internes ----------------------------------------------------#
-    def find_amount_around(index: int, max_dist: int = 8):
-        """
-        Pour le TOTAL : cherche un montant sur la ligne, puis autour
-        (lignes -max_dist .. +max_dist).
-        """
-        for dist in range(0, max_dist + 1):
-            candidates = []
-            if dist == 0:
-                candidates = [index]
-            else:
-                candidates = [index - dist, index + dist]
-            for j in candidates:
-                if 0 <= j < n:
-                    matches = re.findall(r'\d+[.,]\d{2}', lines[j])
-                    if matches:
-                        return _normalize_number(matches[-1])
-        return None
+    if not all_values:
+        return {"ttc": None, "ht": None, "tva": None}
 
-    def find_amount_after(index: int, max_lookahead: int = 10):
-        """
-        Pour HT/TVA : prend la ligne, puis les max_lookahead lignes suivantes.
-        """
-        for j in range(index, min(index + 1 + max_lookahead, n)):
-            matches = re.findall(r'\d+[.,]\d{2}', lines[j])
-            if matches:
-                return _normalize_number(matches[-1])
-        return None
+    # 2) TTC = plus grand montant
+    ttc_val = max(all_values)
 
-    # --- TTC : ligne contenant "TOTAL" --------------------------------------#
-    ttc = None
-    for i, line in enumerate(lines):
-        if "total" in line.lower():
-            ttc = find_amount_around(i, max_dist=8)
-            break
+    # 3) HT : d'abord via un libellé H.T / HT / H T
+    ht_val = None
+    m_ht = re.search(r"(?:H\.?T\.?|H T|HT)[^0-9]*(\d+\.\d{2})", cleaned, re.IGNORECASE)
+    if m_ht:
+        try:
+            ht_val = float(m_ht.group(1))
+        except ValueError:
+            ht_val = None
 
-    # fallback TTC : si toujours rien, on prend le plus GRAND montant du ticket
-    if ttc is None:
-        all_amounts = re.findall(r'\d+[.,]\d{2}', text.replace(" ", ""))
-        if all_amounts:
-            nums = [float(_normalize_number(a)) for a in all_amounts]
-            ttc = f"{max(nums):.2f}"
+    # Sinon : plus grand montant strictement inférieur au TTC
+    if ht_val is None:
+        smaller = [v for v in all_values if v < ttc_val - 1e-6]
+        if smaller:
+            ht_val = max(smaller)
 
-    # --- HT : lignes contenant H.T / HT / HORS TAXE(S) ----------------------#
-    ht = None
-    for i, line in enumerate(lines):
-        low = line.lower()
-        if ("h.t" in low) or ("ht" in low) or ("hors taxe" in low) or ("hors taxes" in low):
-            ht = find_amount_after(i, max_lookahead=10)
-            if ht is not None:
-                break
+    # 4) TVA : d'abord via un libellé TVA
+    tva_val = None
+    m_tva = re.search(r"TVA[^0-9]*(\d+\.\d{2})", cleaned, re.IGNORECASE)
+    if m_tva:
+        try:
+            tva_val = float(m_tva.group(1))
+        except ValueError:
+            tva_val = None
 
-    # --- TVA : lignes contenant TVA -----------------------------------------#
-    tva = None
-    for i, line in enumerate(lines):
-        if "tva" in line.lower():
-            tva = find_amount_after(i, max_lookahead=10)
-            if tva is not None:
-                break
+    # Sinon : on calcule TVA = TTC - HT si possible
+    if tva_val is None and ht_val is not None:
+        tva_val = round(ttc_val - ht_val, 2)
 
-    # --- Fallbacks calculés --------------------------------------------------#
-    try:
-        ttc_f = float(ttc) if ttc is not None else None
-        ht_f = float(ht) if ht is not None else None
-        tva_f = float(tva) if tva is not None else None
-    except ValueError:
-        ttc_f = ht_f = tva_f = None
+    # 5) On renvoie des chaînes "10.90" ou None
+    def fmt(x):
+        return f"{x:.2f}" if x is not None else None
 
-    # TTC absent mais HT + TVA présents
-    if ttc is None and ht_f is not None and tva_f is not None:
-        ttc_f = ht_f + tva_f
-        ttc = f"{ttc_f:.2f}"
+    return {
+        "ttc": fmt(ttc_val),
+        "ht": fmt(ht_val),
+        "tva": fmt(tva_val),
+    }
 
-    # HT absent mais TTC + TVA présents
-    if ht is None and ttc_f is not None and tva_f is not None:
-        ht_f = ttc_f - tva_f
-        ht = f"{ht_f:.2f}"
-
-    # TVA absente mais TTC + HT présents
-    if tva is None and ttc_f is not None and ht_f is not None:
-        tva_f = ttc_f - ht_f
-        tva = f"{tva_f:.2f}"
-
-    return {"ttc": ttc, "ht": ht, "tva": tva}
 
 
 def extract_date(text: str):
