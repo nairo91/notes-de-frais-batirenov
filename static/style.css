@@ -7,7 +7,8 @@ body {
 
 /* Les cartes et tout leur contenu héritent d'une couleur claire */
 .card,
-.card * {
+.card-header,
+.card-body {
   color: #f8f5ff;
 }
 
@@ -112,45 +113,55 @@ input::placeholder {
   max-width: 160px !important;
   height: auto !important;
 }
-
 /* ===================== */
 /*  TABLEAU NOTES DE FRAIS */
 /* ===================== */
 
+/* On neutralise le fond par défaut des tableaux Bootstrap */
+.table tbody tr {
+  background-color: transparent !important;
+}
+
+/* Fond général du tableau */
 #expenses-table {
-  background-color: #070314;          /* fond global du tableau */
-  color: #f8f5ff;                     /* texte très clair */
+  background-color: #070314 !important;   /* fond global du tableau */
+  color: #f8f5ff !important;              /* texte clair par défaut */
 }
 
 /* En-tête du tableau */
 #expenses-table thead th {
-  background-color: #1a1034;          /* bandeau foncé */
-  color: #fdfbff;
-  border-color: rgba(159, 123, 255, 0.5);
+  background-color: #1a1034 !important;   /* bandeau foncé */
+  color: #fdfbff !important;
+  border-color: rgba(159, 123, 255, 0.5) !important;
 }
 
-/* Lignes du tableau */
+/* Lignes impaires */
 #expenses-table tbody tr {
-  background-color: #0e0720;          /* ligne impaire */
-  border-color: rgba(159, 123, 255, 0.25);
+  background-color: #0e0720 !important;   /* ligne impaire foncée */
+  border-color: rgba(159, 123, 255, 0.25) !important;
 }
 
+/* Lignes paires */
 #expenses-table tbody tr:nth-child(even) {
-  background-color: #140a2d;          /* ligne paire */
+  background-color: #140a2d !important;   /* ligne paire un peu différente */
 }
 
-/* Cellules : s’assurer que le texte reste bien blanc */
+/* Cellules : texte bien clair */
 #expenses-table td,
 #expenses-table th {
-  color: #f8f5ff;
+  color: #f8f5ff !important;
+}
+
+/* Survol d'une ligne : un peu plus lumineux */
+#expenses-table tbody tr:hover td {
+  background-color: #24104a !important;
 }
 
 /* Lien "Voir" dans la colonne justificatif */
 #expenses-table a.btn-link {
-  color: #a98bff;
+  color: #a98bff !important;
 }
 
 #expenses-table a.btn-link:hover {
-  color: #d2bfff;
+  color: #d2bfff !important;
 }
-
