@@ -52,11 +52,11 @@ input::placeholder {
 
 /* ====== Tableau ====== */
 
-.table,
+/* .table,
 .table th,
 .table td {
   color: #2d1661 !important;
-}
+} */
 
 .table thead th {
   border-color: rgba(148, 163, 255, 0.6) !important;
@@ -153,3 +153,4 @@ input::placeholder {
 #expenses-table a.btn-link:hover {
   color: #d2bfff;
 }
+
