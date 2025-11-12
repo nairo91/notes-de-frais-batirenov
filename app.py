@@ -758,11 +758,22 @@ def send_report_email(year: int, month: int):
     if not host:
         raise RuntimeError("SMTP_HOST is not configured")
 
-    with smtplib.SMTP(host, port) as server:
-        server.starttls()
-        if user and password:
-            server.login(user, password)
-        server.send_message(msg)
+    print(f"[MAIL] Envoi du récap {year}-{month:02d} via {host}:{port}", flush=True)
+
+    try:
+        # timeout court pour éviter que le worker bloque trop longtemps
+        with smtplib.SMTP(host, port, timeout=10) as server:
+            server.starttls()
+            if user and password:
+                server.login(user, password)
+            server.send_message(msg)
+        print("[MAIL] Envoi OK", flush=True)
+    except Exception as e:
+        # log bien visible dans Render
+        print(f"[MAIL] ERREUR SMTP : {e!r}", flush=True)
+        # on relance l'erreur pour provoquer un 500 (mais avec un log clair)
+        raise
+
 
 
 @app.route("/admin/send_report_now")
