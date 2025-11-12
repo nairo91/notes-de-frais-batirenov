@@ -21,14 +21,13 @@
           <small class="text-muted">Champs marqués * obligatoires.</small>
         </div>
 
-              <!-- Remplace le bouton LOGO par ceci -->
+        <!-- Logo dans la colonne gauche -->
         <a href="{{ url_for('expenses') }}" class="app-logo d-inline-flex align-items-center gap-2 text-decoration-none">
           <img src="{{ url_for('static', filename='img/logo-batirenov.png') }}"
-              alt="BATI RENOV"
-              class="logo-img" />
+               alt="BATI RENOV"
+               class="logo-img" />
           <span class="logo-text">BATI RENOV</span>
         </a>
-          
       </div>
 
       <div class="card-body">
@@ -50,9 +49,26 @@
             </div>
           </div>
 
+          <!-- Date avec petit bouton calendrier (optionnel mais pratique) -->
           <div>
             <label class="form-label">Date *</label>
-            <input type="date" class="form-control" name="date" required>
+            <div class="date-filter-group">
+              <input type="date"
+                     class="form-control"
+                     name="date"
+                     id="expense-date"
+                     required>
+              <button type="button"
+                      class="date-filter-btn"
+                      onclick="
+  const expenseInput = document.getElementById('expense-date');
+  if (expenseInput && expenseInput.showPicker) { expenseInput.showPicker(); }
+  else { expenseInput && expenseInput.focus(); }
+"
+>
+                🗓
+              </button>
+            </div>
           </div>
 
           <div>
@@ -108,62 +124,64 @@
             </h2>
           </div>
 
-         <div class="d-flex flex-wrap gap-2">
+          <!-- Filtres + export -->
+          <div class="d-flex flex-wrap gap-2">
 
-  <!-- Date "Du" avec bouton calendrier -->
-  <div class="date-filter-group">
-    <input type="date"
-           id="filter-date-from"
-           class="form-control form-control-sm"
-           placeholder="Du">
-    <button type="button"
-            class="date-filter-btn"
-            onclick="
-              const input = document.getElementById('filter-date-from');
-              if (input && input.showPicker) { input.showPicker(); }
-              else { input && input.focus(); }
-            ">
-      🗓
-    </button>
-  </div>
+            <!-- Date "Du" avec bouton calendrier -->
+            <div class="date-filter-group">
+              <input type="date"
+                     id="filter-date-from"
+                     class="form-control form-control-sm"
+                     placeholder="Du">
+              <button type="button"
+                      class="date-filter-btn"
+                     onclick="
+  const fromInput = document.getElementById('filter-date-from');
+  if (fromInput && fromInput.showPicker) { fromInput.showPicker(); }
+  else { fromInput && fromInput.focus(); }
+"
+>
+                🗓
+              </button>
+            </div>
 
-  <!-- Date "Au" avec bouton calendrier -->
-  <div class="date-filter-group">
-    <input type="date"
-           id="filter-date-to"
-           class="form-control form-control-sm"
-           placeholder="Au">
-    <button type="button"
-            class="date-filter-btn"
-            onclick="
-              const input = document.getElementById('filter-date-to');
-              if (input && input.showPicker) { input.showPicker(); }
-              else { input && input.focus(); }
-            ">
-      🗓
-    </button>
-  </div>
+            <!-- Date "Au" avec bouton calendrier -->
+            <div class="date-filter-group">
+              <input type="date"
+                     id="filter-date-to"
+                     class="form-control form-control-sm"
+                     placeholder="Au">
+              <button type="button"
+                      class="date-filter-btn"
+                      onclick="
+                        const input = document.getElementById('filter-date-to');
+                        if (input && input.showPicker) { input.showPicker(); }
+                        else { input && input.focus(); }
+                      ">
+                🗓
+              </button>
+            </div>
 
-  <!-- Filtre chantier inchangé -->
-  <input type="text"
-         id="filter-chantier"
-         class="form-control form-control-sm"
-         placeholder="Filtrer chantier">
+            <!-- Filtre chantier -->
+            <input type="text"
+                   id="filter-chantier"
+                   class="form-control form-control-sm"
+                   placeholder="Filtrer chantier">
 
-  <button type="button"
-          class="btn btn-outline-primary btn-sm"
-          id="reset-filters-btn">
-    Réinitialiser
-  </button>*
+            <button type="button"
+                    class="btn btn-outline-primary btn-sm"
+                    id="reset-filters-btn">
+              Réinitialiser
+            </button>
 
-        {% if is_admin %}
-    <a href="{{ url_for('admin_export_all_now') }}"
-       class="btn btn-outline-primary btn-sm ms-2">
-      Exporter tout (CSV)
-    </a>
-  {% endif %}
-</div>
+            {% if is_admin %}
+              <a href="{{ url_for('admin_export_all_now') }}"
+                 class="btn btn-outline-primary btn-sm ms-2">
+                Exporter tout (CSV)
+              </a>
+            {% endif %}
 
+          </div>
         </div>
       </div>
 
