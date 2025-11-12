@@ -467,7 +467,6 @@ def api_expenses():
         })
     return jsonify(data)
 
-
 # -----------------------------------------------------------------------------#
 # OCR : Scan d'un ticket pour pré-remplir la note (TTC / HT / TVA)
 # -----------------------------------------------------------------------------#
@@ -489,67 +488,81 @@ def _normalize_number(s: str):
 def parse_amounts_ttc_ht_tva(text: str):
     """
     Essaie d'extraire TTC, HT et TVA à partir du texte complet OCR.
-
-    Stratégie :
-      1) TTC : on cherche tous les montants suivis de '€' et on prend le plus grand.
-      2) TVA : on cherche une ligne contenant 'TVA' puis un montant sur la même
-               ligne ou dans le texte après.
-      3) HT  : idem avec 'H.T', 'HT', 'hors taxes', etc.
-      4) Si un des trois manque, on tente de le recalculer via TTC = HT + TVA.
+    - TTC : cherche une ligne contenant 'TOTAL' puis un montant autour (avant/après).
+    - HT  : cherche une ligne contenant 'H.T', 'HT', 'HORS TAXE(S)' et prend
+            le montant sur une des lignes SUIVANTES.
+    - TVA : pareil avec une ligne contenant 'TVA'.
+    Si une des valeurs manque mais que 2 sur 3 sont trouvées, on recalcule la 3e.
     """
     if not text:
         return {"ttc": None, "ht": None, "tva": None}
 
-    cleaned_text = text.replace("\u00a0", " ")
-
-    # 1) TTC : montants avec un '€' derrière
-    euro_matches = re.findall(r"(\d+[.,]\d{2})\s*€", cleaned_text)
-    ttc = None
-    if euro_matches:
-        try:
-            nums = [float(m.replace(",", ".")) for m in euro_matches]
-            ttc_val = max(nums)
-            ttc = f"{ttc_val:.2f}"
-        except ValueError:
-            ttc = None
-
-    # On découpe en lignes pour HT/TVA
-    raw_lines = [l for l in cleaned_text.splitlines()]
+    raw_lines = [l for l in text.splitlines()]
     lines = [l.strip() for l in raw_lines if l.strip()]
 
-    def find_amount_after_keyword(keyword: str):
-        """
-        Cherche une ligne qui contient le mot-clé (en minuscules),
-        puis un montant sur la même ligne. Si rien,
-        cherche le premier montant dans tout le texte APRÈS cette ligne.
-        """
-        keyword = keyword.lower()
-        for i, line in enumerate(lines):
-            lower = line.lower()
-            if keyword in lower:
-                # 1) Sur la même ligne
-                matches = re.findall(r"\d+[.,]\d{2}", line)
-                if matches:
-                    return _normalize_number(matches[-1])
+    n = len(lines)
 
-                # 2) Sinon, dans ce qui suit
-                tail = "\n".join(lines[i + 1:])
-                matches2 = re.findall(r"\d+[.,]\d{2}", tail)
-                if matches2:
-                    return _normalize_number(matches2[0])
+    # --- helpers internes ----------------------------------------------------#
+    def find_amount_around(index: int, max_dist: int = 8):
+        """
+        Pour le TOTAL : cherche un montant sur la ligne, puis autour
+        (lignes -max_dist .. +max_dist).
+        """
+        for dist in range(0, max_dist + 1):
+            candidates = []
+            if dist == 0:
+                candidates = [index]
+            else:
+                candidates = [index - dist, index + dist]
+            for j in candidates:
+                if 0 <= j < n:
+                    matches = re.findall(r'\d+[.,]\d{2}', lines[j])
+                    if matches:
+                        return _normalize_number(matches[-1])
         return None
 
-    # 2) TVA
-    tva = find_amount_after_keyword("tva")
+    def find_amount_after(index: int, max_lookahead: int = 10):
+        """
+        Pour HT/TVA : prend la ligne, puis les max_lookahead lignes suivantes.
+        """
+        for j in range(index, min(index + 1 + max_lookahead, n)):
+            matches = re.findall(r'\d+[.,]\d{2}', lines[j])
+            if matches:
+                return _normalize_number(matches[-1])
+        return None
 
-    # 3) HT
-    ht = None
-    for kw in ["h.t", "ht", "hors taxes", "hors taxe"]:
-        ht = find_amount_after_keyword(kw)
-        if ht:
+    # --- TTC : ligne contenant "TOTAL" --------------------------------------#
+    ttc = None
+    for i, line in enumerate(lines):
+        if "total" in line.lower():
+            ttc = find_amount_around(i, max_dist=8)
             break
 
-    # 4) Fallbacks calculés
+    # fallback TTC : si toujours rien, on prend le plus GRAND montant du ticket
+    if ttc is None:
+        all_amounts = re.findall(r'\d+[.,]\d{2}', text.replace(" ", ""))
+        if all_amounts:
+            nums = [float(_normalize_number(a)) for a in all_amounts]
+            ttc = f"{max(nums):.2f}"
+
+    # --- HT : lignes contenant H.T / HT / HORS TAXE(S) ----------------------#
+    ht = None
+    for i, line in enumerate(lines):
+        low = line.lower()
+        if ("h.t" in low) or ("ht" in low) or ("hors taxe" in low) or ("hors taxes" in low):
+            ht = find_amount_after(i, max_lookahead=10)
+            if ht is not None:
+                break
+
+    # --- TVA : lignes contenant TVA -----------------------------------------#
+    tva = None
+    for i, line in enumerate(lines):
+        if "tva" in line.lower():
+            tva = find_amount_after(i, max_lookahead=10)
+            if tva is not None:
+                break
+
+    # --- Fallbacks calculés --------------------------------------------------#
     try:
         ttc_f = float(ttc) if ttc is not None else None
         ht_f = float(ht) if ht is not None else None
@@ -613,7 +626,7 @@ def scan_receipt():
     if not ocr_api_key:
         return jsonify({"error": "OCR non configuré (OCRSPACE_API_KEY manquant)"}), 500
 
-    # On compresse/redimensionne l'image pour rester raisonnable
+    # On compresse/redimensionne l'image pour rester < 1 Mo
     try:
         img = Image.open(file.stream)
 
@@ -659,7 +672,7 @@ def scan_receipt():
 
     text = " ".join(r.get("ParsedText", "") for r in parsed_results) or ""
 
-    # Logs debug dans Render (pratique)
+    # Logs debug dans Render
     print("=== OCR RAW TEXT ===")
     print(text)
     print("====================")
@@ -689,7 +702,6 @@ def scan_receipt():
         "label": label_guess,
         "raw_text": text,
     })
-
 
 # -----------------------------------------------------------------------------#
 # GÉNÉRATION DU RÉCAP MENSUEL + ENVOI MAIL
