@@ -3,26 +3,14 @@
 {% block title %}Notes de frais{% endblock %}
 
 {% block content %}
-<div class="page-hero glass-card border-0 shadow-lg mb-4 p-4">
-  <div>
-    <h1 class="page-title mb-2">Gestion des notes de frais</h1>
-    <p class="page-subtitle mb-0">
-      Visualisez vos justificatifs, filtrez vos dépenses et suivez leur validation en un clin d'œil.
-    </p>
-  </div>
-  <div class="logo-placeholder logo-placeholder-sm ms-auto">
-    <span>Logo de l'entreprise</span>
-  </div>
-</div>
-
 <div class="row g-4">
 
   <!-- Colonne formulaire -->
   <div class="col-lg-4">
-    <div class="card glass-card border-0 shadow-lg h-100">
+    <div class="card shadow-sm">
       <div class="card-body">
-        <h2 class="section-title mb-3">Nouvelle note de frais</h2>
-        <p class="section-subtitle small">
+        <h2 class="h5 mb-3">Nouvelle note de frais</h2>
+        <p class="text-muted small">
           Champs marqués * obligatoires.
         </p>
 
@@ -61,16 +49,16 @@
             <label class="form-label">Justificatif (photo ticket / facture)</label>
             <div class="input-group">
               <input type="file" class="form-control" name="receipt" accept="image/*">
-              <button type="button" class="btn btn-soft" id="scan-ticket-btn">
+              <button type="button" class="btn btn-outline-secondary" id="scan-ticket-btn">
                 Scanner le ticket
               </button>
             </div>
-            <small class="help-text">
+            <small class="text-muted">
               Le scan tente de remplir automatiquement le montant, la date, le HT et la TVA.
             </small>
           </div>
 
-          <button type="submit" class="btn btn-gradient w-100">
+          <button type="submit" class="btn btn-success w-100">
             Enregistrer la note
           </button>
         </form>
@@ -80,10 +68,10 @@
 
   <!-- Colonne tableau -->
   <div class="col-lg-8">
-    <div class="card glass-card border-0 shadow-lg mb-3">
+    <div class="card shadow-sm mb-3">
       <div class="card-body">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
-          <h2 class="section-title mb-0">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+          <h2 class="h5 mb-0">
             {% if is_admin %}
               Toutes les notes de frais
             {% else %}
@@ -92,20 +80,20 @@
           </h2>
 
           <div class="d-flex flex-wrap gap-2">
-            <input type="date" id="filter-date-from" class="form-control form-control-sm control-soft" placeholder="Du">
-            <input type="date" id="filter-date-to" class="form-control form-control-sm control-soft" placeholder="Au">
-            <input type="text" id="filter-chantier" class="form-control form-control-sm control-soft" placeholder="Filtrer chantier">
-            <button type="button" class="btn btn-soft btn-sm" id="reset-filters-btn">
+            <input type="date" id="filter-date-from" class="form-control form-control-sm" placeholder="Du">
+            <input type="date" id="filter-date-to" class="form-control form-control-sm" placeholder="Au">
+            <input type="text" id="filter-chantier" class="form-control form-control-sm" placeholder="Filtrer chantier">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="reset-filters-btn">
               Réinitialiser
             </button>
           </div>
         </div>
 
         <div class="d-flex justify-content-end mb-2 gap-2">
-          <button type="button" class="btn btn-ghost btn-sm" id="sort-date-btn">
+          <button type="button" class="btn btn-outline-primary btn-sm" id="sort-date-btn">
             Trier par date
           </button>
-          <button type="button" class="btn btn-ghost btn-sm" id="sort-amount-btn">
+          <button type="button" class="btn btn-outline-primary btn-sm" id="sort-amount-btn">
             Trier par montant
           </button>
         </div>
