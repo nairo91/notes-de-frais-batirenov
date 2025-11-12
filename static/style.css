@@ -112,3 +112,44 @@ input::placeholder {
   max-width: 160px !important;
   height: auto !important;
 }
+
+/* ===================== */
+/*  TABLEAU NOTES DE FRAIS */
+/* ===================== */
+
+#expenses-table {
+  background-color: #070314;          /* fond global du tableau */
+  color: #f8f5ff;                     /* texte très clair */
+}
+
+/* En-tête du tableau */
+#expenses-table thead th {
+  background-color: #1a1034;          /* bandeau foncé */
+  color: #fdfbff;
+  border-color: rgba(159, 123, 255, 0.5);
+}
+
+/* Lignes du tableau */
+#expenses-table tbody tr {
+  background-color: #0e0720;          /* ligne impaire */
+  border-color: rgba(159, 123, 255, 0.25);
+}
+
+#expenses-table tbody tr:nth-child(even) {
+  background-color: #140a2d;          /* ligne paire */
+}
+
+/* Cellules : s’assurer que le texte reste bien blanc */
+#expenses-table td,
+#expenses-table th {
+  color: #f8f5ff;
+}
+
+/* Lien "Voir" dans la colonne justificatif */
+#expenses-table a.btn-link {
+  color: #a98bff;
+}
+
+#expenses-table a.btn-link:hover {
+  color: #d2bfff;
+}
