@@ -108,21 +108,62 @@
             </h2>
           </div>
 
-          <div class="d-flex flex-wrap gap-2">
-            <input type="date" id="filter-date-from" class="form-control form-control-sm" placeholder="Du">
-            <input type="date" id="filter-date-to" class="form-control form-control-sm" placeholder="Au">
-            <input type="text" id="filter-chantier" class="form-control form-control-sm" placeholder="Filtrer chantier">
-            <button type="button" class="btn btn-outline-primary btn-sm" id="reset-filters-btn">
-              Réinitialiser
-            </button>
+         <div class="d-flex flex-wrap gap-2">
 
-             {% if is_admin %}
+  <!-- Date "Du" avec bouton calendrier -->
+  <div class="date-filter-group">
+    <input type="date"
+           id="filter-date-from"
+           class="form-control form-control-sm"
+           placeholder="Du">
+    <button type="button"
+            class="date-filter-btn"
+            onclick="
+              const input = document.getElementById('filter-date-from');
+              if (input && input.showPicker) { input.showPicker(); }
+              else { input && input.focus(); }
+            ">
+      🗓
+    </button>
+  </div>
+
+  <!-- Date "Au" avec bouton calendrier -->
+  <div class="date-filter-group">
+    <input type="date"
+           id="filter-date-to"
+           class="form-control form-control-sm"
+           placeholder="Au">
+    <button type="button"
+            class="date-filter-btn"
+            onclick="
+              const input = document.getElementById('filter-date-to');
+              if (input && input.showPicker) { input.showPicker(); }
+              else { input && input.focus(); }
+            ">
+      🗓
+    </button>
+  </div>
+
+  <!-- Filtre chantier inchangé -->
+  <input type="text"
+         id="filter-chantier"
+         class="form-control form-control-sm"
+         placeholder="Filtrer chantier">
+
+  <button type="button"
+          class="btn btn-outline-primary btn-sm"
+          id="reset-filters-btn">
+    Réinitialiser
+  </button>*
+
+        {% if is_admin %}
     <a href="{{ url_for('admin_export_all_now') }}"
        class="btn btn-outline-primary btn-sm ms-2">
       Exporter tout (CSV)
     </a>
   {% endif %}
-          </div>
+</div>
+
         </div>
       </div>
 
