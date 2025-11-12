@@ -20,3 +20,137 @@ body {
     padding-top: 0.4rem;
     padding-bottom: 0.4rem;
 }
+
+/* ---------- Palette et thème ---------- */
+:root{
+  --violet-900: #1b0c2f;
+  --violet-800: #29104e;
+  --violet-700: #3c1472;
+  --violet-600: #54219F;
+  --violet-500: #6B2BD8;  /* accent */
+  --violet-400: #8F5BFF;
+  --bg-deg-start: #100720;
+  --bg-deg-end:   #2b0e4f;
+  --text-strong: #ffffff;
+  --text-normal: #E9E7F1;
+  --text-muted:  #C9C4DA; /* placeholders, aides */
+  --surface-1: rgba(255,255,255,0.06);
+  --surface-2: rgba(255,255,255,0.10);
+  --border-weak: rgba(255,255,255,0.16);
+  --success: #25c08a;
+  --danger:  #ff5d6c;
+  --warning: #ffb74d;
+}
+
+html, body{
+  height: 100%;
+  background: linear-gradient(145deg, var(--bg-deg-start), var(--bg-deg-end));
+  color: var(--text-normal);
+}
+
+/* Force un bon contraste sur les titres et labels */
+h1,h2,h3,h4,h5,h6,
+label, .form-label,
+.table thead th{
+  color: var(--text-strong);
+}
+
+/* ---------- Cartes & conteneurs ---------- */
+.card{
+  background: var(--surface-1);
+  border: 1px solid var(--border-weak);
+  backdrop-filter: blur(6px);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+
+/* ---------- Table ---------- */
+.table{
+  color: var(--text-normal);
+}
+.table thead{
+  background: var(--surface-2);
+}
+.table tbody tr{
+  border-color: var(--border-weak);
+}
+.table a.btn-link{
+  color: var(--violet-400);
+}
+
+/* ---------- Inputs ---------- */
+.form-control,
+.form-select{
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--border-weak);
+  color: var(--text-strong);
+  border-radius: 12px;
+}
+.form-control:focus,
+.form-select:focus{
+  border-color: var(--violet-400);
+  box-shadow: 0 0 0 0.2rem rgba(107, 43, 216, 0.35);
+  background: rgba(255,255,255,0.12);
+  color: var(--text-strong);
+}
+
+/* Placeholders trop sombres → on les éclaircit */
+::placeholder{
+  color: var(--text-muted) !important;
+  opacity: 1;
+}
+
+/* Petits champs date/filtre dans l’entête de droite */
+#filter-date-from,
+#filter-date-to,
+#filter-chantier{
+  background: rgba(255,255,255,0.08);
+  color: var(--text-normal);
+  border: 1px solid var(--border-weak);
+}
+
+/* ---------- Boutons ---------- */
+.btn{
+  border-radius: 12px;
+  border: 1px solid transparent;
+}
+.btn-success{
+  background: linear-gradient(180deg, #2dcc9f, #17a77f);
+  color: #061a14;
+}
+.btn-outline-primary,
+.btn-outline-secondary{
+  color: var(--text-normal);
+  border-color: var(--violet-400);
+}
+.btn-outline-primary:hover,
+.btn-outline-secondary:hover{
+  background: var(--violet-500);
+  border-color: var(--violet-500);
+  color: #fff;
+}
+.btn-primary{
+  background: var(--violet-500);
+  border-color: var(--violet-500);
+}
+
+/* ---------- Badges statut ---------- */
+.badge.bg-success{ background: var(--success) !important; color:#041a12; }
+.badge.bg-danger{  background: var(--danger)  !important; }
+.badge.bg-secondary{ background: var(--violet-600) !important; }
+
+/* ---------- Logo ---------- */
+.app-logo .logo-img{
+  height: 36px; /* ajuste si besoin */
+  width: auto;
+  display: block;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.25));
+}
+.app-logo .logo-text{
+  font-weight: 700;
+  letter-spacing: .4px;
+  color: var(--text-strong);
+}
+
+/* ---------- Petits ajustes d’accessibilité ---------- */
+a, button { outline-color: var(--violet-400); }
