@@ -2,6 +2,10 @@
 
 {% block title %}Notes de frais{% endblock %}
 
+{% block extra_css %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="row g-4">
 

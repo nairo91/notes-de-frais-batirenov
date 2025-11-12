@@ -1,180 +1,102 @@
-/* ========== Base ========== */
+/* ====== Lisibilité globale sur fond violet ====== */
 
+/* Couleur de texte par défaut très claire */
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  height: 100%;
-  margin: 0;
-  background: linear-gradient(145deg, #100720, #2b0e4f);
-  color: #f8f5ff; /* texte très clair par défaut */
+  color: #f8f5ff;
 }
 
-/* Laisse les cartes hériter de la couleur du body */
+/* Les cartes et tout leur contenu héritent d'une couleur claire */
 .card,
-.card-header,
-.card-body {
-  color: inherit;
+.card * {
+  color: #f8f5ff;
 }
 
-/* Cartes un peu plus jolies */
-.card {
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(6px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-}
-
-.card-body {
-  padding: 1.5rem;
-}
-
-.table-sm td,
-.table-sm th {
-  padding-top: 0.4rem;
-  padding-bottom: 0.4rem;
-}
-
-/* ========== Typo / textes ========== */
-
-/* Titres, labels, tableaux, petits textes… tout en clair */
-h1, h2, h3, h4, h5, h6,
+/* Labels, petits textes, etc. */
 label,
 .form-label,
 small,
-.card-header,
-.card-body,
+.br-card-header small {
+  color: #f8f5ff;
+}
+
+/* Texte "muted" (aides, tirets, infos secondaires) */
+.text-muted,
+small.text-muted {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* ====== Champs de formulaire ====== */
+
+.form-control,
+.form-select {
+  color: #fdfbff !important;
+  background-color: rgba(12, 9, 32, 0.9) !important;
+  border-color: #9f7bff !important;
+  border-radius: 10px;
+}
+
+.form-control::placeholder,
+.form-select::placeholder,
+input::placeholder {
+  color: rgba(230, 230, 255, 0.75) !important;
+  opacity: 1 !important;
+}
+
+/* Focus sur les champs */
+.form-control:focus,
+.form-select:focus {
+  color: #ffffff !important;
+  border-color: #c4a1ff !important;
+  box-shadow: 0 0 0 0.2rem rgba(159, 123, 255, 0.35) !important;
+}
+
+/* ====== Tableau ====== */
+
 .table,
 .table th,
 .table td {
   color: #f8f5ff !important;
 }
 
-/* Texte "muted" (aides, tirets, etc.) un peu plus doux mais lisible */
-.text-muted,
-small.text-muted {
-  color: rgba(255, 255, 255, 0.65) !important;
-}
-
-/* ========== Table ========== */
-
-.table {
-  color: #f8f5ff;
-}
-
 .table thead th {
-  color: #e5e7ff;
-  border-color: rgba(148, 163, 255, 0.35);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(148, 163, 255, 0.6) !important;
 }
 
 .table tbody td {
-  border-color: rgba(30, 64, 175, 0.6);
+  border-color: rgba(55, 65, 140, 0.7) !important;
 }
 
-/* liens "Voir" dans le tableau */
+/* Bouton/lien "Voir" */
 .btn-link {
-  color: #a98bff;
+  color: #bba4ff !important;
 }
 
 .btn-link:hover {
-  color: #d2bfff;
+  color: #e0ccff !important;
 }
 
-/* ========== Formulaires ========== */
-
-.form-control,
-.form-select {
-  color: #fdfbff !important;
-  background-color: rgba(12, 9, 32, 0.9);
-  border-color: #3c2f70;
-  border-radius: 12px;
-}
-
-/* Placeholders (jj/mm/aaaa, Ex: Déjeuner client…) */
-.form-control::placeholder,
-.form-select::placeholder {
-  color: rgba(255, 255, 255, 0.45) !important;
-  opacity: 1;
-}
-
-/* Focus sur les champs : bord violet clair + légère lueur */
-.form-control:focus,
-.form-select:focus {
-  color: #ffffff !important;
-  background-color: rgba(8, 5, 25, 0.95);
-  border-color: #9f7bff !important;
-  box-shadow: 0 0 0 0.2rem rgba(159, 123, 255, 0.35);
-}
-
-/* Petits inputs de filtre (date / chantier) à droite */
-#filter-date-from,
-#filter-date-to,
-#filter-chantier {
-  background-color: rgba(12, 9, 32, 0.9);
-  color: #f8f5ff;
-  border-color: #3c2f70;
-}
-
-/* ========== Boutons ========== */
-
-.btn {
-  border-radius: 12px;
-  border: 1px solid transparent;
-}
-
-.btn-success {
-  background: linear-gradient(180deg, #2dcc9f, #17a77f);
-  color: #061a14;
-}
-
-.btn-outline-primary {
-  color: #d7c8ff;
-  border-color: #9f7bff;
-}
-
-.btn-outline-primary:hover,
-.btn-outline-primary:focus {
-  color: #ffffff;
-  background: linear-gradient(90deg, #8b5cff, #c262ff);
-  border-color: transparent;
-}
-
-/* ========== Badges (statuts) ========== */
-
-.badge.bg-success {
-  background: #25c08a !important;
-  color: #041a12;
-}
-.badge.bg-danger {
-  background: #ff5d6c !important;
-}
+/* Badges */
 .badge.bg-secondary {
-  background: #5c5676 !important;
+  background-color: #5c5676 !important;
   color: #f8f5ff !important;
 }
 
-/* ========== Logo ========== */
+/* ====== Logo dans la colonne gauche des notes ====== */
 
-/* Logo dans la barre tout en haut (navbar) */
-.navbar-brand .logo-img {
-  height: 22px;      /* petit logo discret en haut */
-  width: auto;
-  display: block;
-}
-
-/* Logo dans la carte "Nouvelle note de frais" */
 .app-logo {
   padding: 0.35rem 0.75rem;
   border-radius: 999px;
   background: rgba(15, 23, 42, 0.7);
   border: 1px solid rgba(148, 163, 255, 0.4);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .app-logo .logo-img {
-  height: 28px;      /* un peu plus grand que celui du header */
-  width: auto;
+  height: 32px !important;
+  width: auto !important;
   display: block;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.25));
 }
 
 .app-logo .logo-text {
@@ -182,17 +104,11 @@ small.text-muted {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-size: 0.75rem;
-  color: #fdfbff;
+  color: #fdfbff !important;
 }
 
-/* sécurité : toute image de logo ne dépassera pas cette taille */
-.logo-img {
-  max-height: 32px;
-  width: auto;
-}
-
-/* ========== Accessibilité / focus ========== */
-
-a, button {
-  outline-color: #9f7bff;
+/* Sécurité : empêcher un logo géant dans cette colonne */
+.col-lg-4 img.logo-img {
+  max-width: 160px !important;
+  height: auto !important;
 }
