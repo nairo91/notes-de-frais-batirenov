@@ -154,3 +154,61 @@ label, .form-label,
 
 /* ---------- Petits ajustes d’accessibilité ---------- */
 a, button { outline-color: var(--violet-400); }
+
+/* ====== Lisibilité sur fond sombre ====== */
+
+/* Couleur de texte par défaut sur le fond violet */
+body {
+  color: #f9fafb; /* blanc cassé */
+}
+
+/* Labels des formulaires */
+.form-label {
+  color: #e5e7ff;
+}
+
+/* Champs de formulaire */
+.form-control,
+.form-control:focus {
+  color: #f9fafb;  /* texte dans les inputs */
+  background-color: rgba(15, 10, 40, 0.7);
+  border-color: rgba(148, 163, 255, 0.5);
+}
+
+/* Placeholder (“jj/mm/aaaa”, etc.) */
+.form-control::placeholder {
+  color: rgba(203, 213, 255, 0.7);
+}
+
+/* Texte “gris” de Bootstrap → on l’éclaircit */
+.text-muted {
+  color: #a5b4fc !important;  /* lavande claire */
+}
+
+/* Petits textes dans les en-têtes de cartes */
+.br-card-header small {
+  color: #c7d2fe;
+}
+
+/* Tableau : forcer la couleur des textes */
+.table {
+  color: #f9fafb;
+}
+
+.table thead th {
+  color: #e5e7ff;
+  border-color: rgba(148, 163, 255, 0.35);
+}
+
+.table tbody td {
+  border-color: rgba(30, 64, 175, 0.6);
+}
+
+/* Boutons "Voir" (lien) plus visibles sur fond sombre */
+.btn-link {
+  color: #a5b4fc;
+}
+
+.btn-link:hover {
+  color: #c7d2fe;
+}
