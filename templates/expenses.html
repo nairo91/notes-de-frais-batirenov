@@ -115,6 +115,13 @@
             <button type="button" class="btn btn-outline-primary btn-sm" id="reset-filters-btn">
               Réinitialiser
             </button>
+
+             {% if is_admin %}
+    <a href="{{ url_for('admin_export_all_now') }}"
+       class="btn btn-outline-primary btn-sm ms-2">
+      Exporter tout (CSV)
+    </a>
+  {% endif %}
           </div>
         </div>
       </div>

@@ -545,7 +545,6 @@ def parse_amounts_ttc_ht_tva(text: str):
     }
 
 
-
 def extract_date(text: str):
     """
     Cherche une date JJ/MM/AAAA ou AAAA-MM-JJ.
@@ -662,9 +661,16 @@ def scan_receipt():
     })
 
 # -----------------------------------------------------------------------------#
-# GÉNÉRATION DU RÉCAP MENSUEL + ENVOI MAIL
+# GÉNÉRATION DU RÉCAP MENSUEL + ENVOI MAIL / EXPORT
 # -----------------------------------------------------------------------------#
-def generate_monthly_report(year: int, month: int):
+
+def generate_monthly_report(year: int, month: int, approved_only: bool = True):
+    """
+    Récupère les notes de frais pour un mois donné.
+
+    approved_only = True  -> uniquement les notes avec status = 'approved'
+    approved_only = False -> toutes les notes, peu importe le statut
+    """
     conn = get_db()
     cur = conn.cursor()
 
@@ -674,16 +680,20 @@ def generate_monthly_report(year: int, month: int):
     else:
         end = date(year, month + 1, 1)
 
-    cur.execute(
-        """
+    query = """
         SELECT user_email, amount, amount_ht, tva_amount,
-               date, label, chantier, receipt_path
+               date, label, chantier, receipt_path, status
         FROM expenses
         WHERE date >= %s AND date < %s
-        ORDER BY date ASC
-        """,
-        (start, end)
-    )
+    """
+    params = [start, end]
+
+    if approved_only:
+        query += " AND status = 'approved'"
+
+    query += " ORDER BY date ASC"
+
+    cur.execute(query, params)
     rows = cur.fetchall()
     conn.close()
 
@@ -698,6 +708,7 @@ def generate_monthly_report(year: int, month: int):
             "label": r[5],
             "chantier": r[6],
             "receipt_path": r[7],
+            "status": r[8],
         })
     return result
 
@@ -709,7 +720,7 @@ def format_report_csv(rows):
     writer = csv_module.writer(output, delimiter=";")
     writer.writerow([
         "Date", "Montant TTC", "Montant HT", "TVA",
-        "Libellé", "Chantier", "Utilisateur", "Justificatif"
+        "Libellé", "Chantier", "Utilisateur", "Statut", "Justificatif"
     ])
     for r in rows:
         writer.writerow([
@@ -720,12 +731,18 @@ def format_report_csv(rows):
             r["label"],
             r["chantier"],
             r["user_email"],
+            r.get("status", ""),
             r["receipt_path"] or "",
         ])
     return output.getvalue()
 
+
 @app.route("/admin/export_last_month")
 def admin_export_last_month():
+    """
+    Export CSV du mois précédent, utilisé par le scenario Make (webhook).
+    On n'exporte que les notes APPROUVÉES pour la compta.
+    """
     # --- petite sécurité avec un "secret" dans l'URL ---
     api_key = request.args.get("key", "")
     if api_key != os.environ.get("EXPORT_API_KEY", "dev-secret"):
@@ -736,8 +753,8 @@ def admin_export_last_month():
     month = today.month - 1 or 12
     year = today.year if today.month > 1 else today.year - 1
 
-    # On génère les données
-    rows = generate_monthly_report(year, month)
+    # On génère les données -> uniquement approved
+    rows = generate_monthly_report(year, month, approved_only=True)
     csv_content = format_report_csv(rows)
 
     filename = f"notes-de-frais-{year}-{month:02d}.csv"
@@ -751,10 +768,14 @@ def admin_export_last_month():
 
 
 def send_report_email(year: int, month: int):
+    """
+    Envoi du récap par mail (si SMTP dispo).
+    On n'envoie que les notes APPROUVÉES.
+    """
     import smtplib
     from email.message import EmailMessage
 
-    rows = generate_monthly_report(year, month)
+    rows = generate_monthly_report(year, month, approved_only=True)
     csv_content = format_report_csv(rows)
 
     msg = EmailMessage()
@@ -800,7 +821,6 @@ def send_report_email(year: int, month: int):
         raise
 
 
-
 @app.route("/admin/send_report_now")
 @admin_required
 def admin_send_report_now():
@@ -813,7 +833,7 @@ def admin_send_report_now():
 
 
 def cli_send_report_cron():
-    """Fonction appelée par le cron Render (python app.py send_report_cron)."""
+    """Fonction appelée éventuellement par un cron Render (python app.py send_report_cron)."""
     today = date.today()
     month = today.month - 1 or 12
     year = today.year if today.month > 1 else today.year - 1
@@ -827,7 +847,7 @@ def cli_send_report_cron():
 @admin_required
 def admin_export():
     """
-    Export CSV des notes de frais pour un mois donné.
+    Export CSV des notes de frais VALIDÉES pour un mois donné.
     GET :
       - year
       - month
@@ -839,10 +859,100 @@ def admin_export():
     except (TypeError, ValueError):
         return "Paramètres year et month invalides", 400
 
-    rows = generate_monthly_report(year, month)
+    rows = generate_monthly_report(year, month, approved_only=True)
     csv_content = format_report_csv(rows)
 
     filename = f"notes-de-frais-{year}-{month:02d}.csv"
+    return Response(
+        csv_content,
+        mimetype="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )
+
+
+@app.route("/admin/export_all_now")
+@admin_required
+def admin_export_all_now():
+    """
+    Export CSV de TOUTES les notes de frais (tous statuts, toutes dates).
+    Accessible uniquement pour les admins, via un bouton dans l'interface.
+    """
+    import io
+    import csv as csv_module
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT
+            date,
+            amount,
+            amount_ht,
+            tva_amount,
+            label,
+            chantier,
+            user_email,
+            receipt_path,
+            status,
+            validated_by,
+            validated_at
+        FROM expenses
+        ORDER BY date ASC, id ASC
+        """
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv_module.writer(output, delimiter=";")
+
+    # En-têtes du CSV
+    writer.writerow([
+        "Date",
+        "Montant TTC",
+        "Montant HT",
+        "TVA",
+        "Libellé",
+        "Chantier",
+        "Utilisateur",
+        "Justificatif",
+        "Statut",
+        "Validé par",
+        "Date de validation"
+    ])
+
+    for r in rows:
+        date_val = r[0].strftime("%Y-%m-%d") if r[0] else ""
+        amount = float(r[1]) if r[1] is not None else ""
+        amount_ht = float(r[2]) if r[2] is not None else ""
+        tva_amount = float(r[3]) if r[3] is not None else ""
+        label = r[4] or ""
+        chantier = r[5] or ""
+        user_email = r[6] or ""
+        receipt_path = r[7] or ""
+        status = r[8] or ""
+        validated_by = r[9] or ""
+        validated_at = r[10].strftime("%Y-%m-%d %H:%M:%S") if r[10] else ""
+
+        writer.writerow([
+            date_val,
+            amount,
+            amount_ht,
+            tva_amount,
+            label,
+            chantier,
+            user_email,
+            receipt_path,
+            status,
+            validated_by,
+            validated_at
+        ])
+
+    csv_content = output.getvalue()
+    filename = f"notes-de-frais-ALL-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.csv"
+
     return Response(
         csv_content,
         mimetype="text/csv; charset=utf-8",
