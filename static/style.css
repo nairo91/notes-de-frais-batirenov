@@ -232,3 +232,124 @@ body {
   font-size: 0.75rem;
   color: #e5e7ff;
 }
+
+/* ---------- Lisibilité texte sur fond sombre ---------- */
+
+/* Couleur de texte par défaut très claire */
+body {
+  color: #f8f5ff;
+}
+
+/* Les cartes utilisent la même couleur de texte */
+.card,
+.card-header,
+.card-body {
+  color: inherit;
+}
+
+/* Labels, cellules de tableau, texte de formulaires */
+.form-label,
+.table,
+.table th,
+.table td {
+  color: #f8f5ff;
+}
+
+/* Texte "muted" (petites infos, tirets, etc.) -> plus clair */
+.text-muted,
+small.text-muted {
+  color: #c7c2ff !important;
+  opacity: 0.95;
+}
+
+/* Placeholder dans les inputs (jj/mm/aaaa, etc.) */
+.form-control::placeholder {
+  color: #b6afe5 !important;
+  opacity: 1;
+}
+
+/* Inputs : fond un peu plus clair et bord violet */
+.form-control {
+  background-color: #0c061a;
+  border-color: #3c2f70;
+  color: #f8f5ff;
+}
+
+/* Texte des boutons liens ("Voir", etc.) */
+.btn-link {
+  color: #a98bff;
+}
+
+.btn-link:hover {
+  color: #d2bfff;
+}
+
+/* Les petits badges restent lisibles */
+.badge.bg-secondary {
+  background-color: #5c5676;
+  color: #f8f5ff;
+}
+
+/* Logo texte toujours bien blanc */
+.app-logo,
+.app-logo .logo-text {
+  color: #fdfbff !important;
+}
+
+/* ---------- Lisibilité sur fond sombre ---------- */
+
+/* Couleur de texte par défaut très claire */
+body {
+  color: #f8f5ff;
+}
+
+/* Labels, petits textes, etc. */
+label,
+.form-label,
+small,
+.card-body,
+.card-header,
+.table,
+.table th,
+.table td {
+  color: #f8f5ff !important;
+}
+
+/* Texte "muted" (aide, tirets dans le tableau, etc.) */
+.text-muted {
+  color: rgba(255, 255, 255, 0.65) !important;
+}
+
+/* Champs de formulaire sur fond foncé */
+.form-control,
+.form-select {
+  color: #fdfbff !important;
+  background-color: rgba(12, 9, 32, 0.9); /* ton fond actuel */
+}
+
+/* Placeholder (jj/mm/aaaa, Ex: Déjeuner client, etc.) */
+.form-control::placeholder,
+.form-select::placeholder {
+  color: rgba(255, 255, 255, 0.45) !important;
+}
+
+/* Focus sur les champs : bord violet clair + légère lueur */
+.form-control:focus,
+.form-select:focus {
+  color: #ffffff !important;
+  border-color: #9f7bff !important;
+  box-shadow: 0 0 0 0.2rem rgba(159, 123, 255, 0.35);
+}
+
+/* Boutons outline sur fond sombre (Réinitialiser, Trier, etc.) */
+.btn-outline-primary {
+  color: #d7c8ff;
+  border-color: #9f7bff;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-primary:focus {
+  color: #ffffff;
+  background: linear-gradient(90deg, #8b5cff, #c262ff);
+  border-color: transparent;
+}
