@@ -18,13 +18,13 @@ function setupFiltersAndSorting() {
   let sortAmountAsc = true;
 
   function applyFilters() {
-    const from = dateFromInput.value || null;
-    const to = dateToInput.value || null;
-    const chantier = (chantierInput.value || "").toLowerCase();
+    const from = dateFromInput ? dateFromInput.value || null : null;
+    const to = dateToInput ? dateToInput.value || null : null;
+    const chantier = (chantierInput?.value || "").toLowerCase();
 
     rows.forEach((row) => {
       const rowDate = row.getAttribute("data-date") || "";
-      const rowChantier = row.getAttribute("data-chantier") || "";
+      const rowChantier = (row.getAttribute("data-chantier") || "").toLowerCase();
 
       let visible = true;
 
@@ -46,7 +46,6 @@ function setupFiltersAndSorting() {
 
   function sortBy(field, asc) {
     const factor = asc ? 1 : -1;
-
     const visibleRows = rows.slice().filter((r) => r.style.display !== "none");
 
     visibleRows.sort((a, b) => {
@@ -67,7 +66,6 @@ function setupFiltersAndSorting() {
       return 0;
     });
 
-    // Réinsère seulement les visibles dans l'ordre, sans toucher au HTML des boutons
     visibleRows.forEach((row) => tbody.appendChild(row));
   }
 
@@ -121,25 +119,24 @@ function setupScanButton() {
           return;
         }
 
-        // TTC
-        if (data.amount) {
-          const amountInput = document.querySelector('input[name="amount"]');
-          if (amountInput) amountInput.value = data.amount.replace(".", ",");
+        console.log("OCR data:", data);
+
+        // helper pour remplir un input number proprement
+        function fillNumber(selector, value) {
+          const input = document.querySelector(selector);
+          if (!input || value == null) return;
+          const num = parseFloat(value);
+          if (!isNaN(num)) {
+            input.value = num.toFixed(2); // ex: 10.90 -> "10.90"
+          }
         }
 
-        // HT
-        if (data.amount_ht) {
-          const htInput = document.querySelector('input[name="amount_ht"]');
-          if (htInput) htInput.value = data.amount_ht.replace(".", ",");
-        }
+        // TTC / HT / TVA
+        fillNumber('input[name="amount"]', data.amount);
+        fillNumber('input[name="amount_ht"]', data.amount_ht);
+        fillNumber('input[name="tva_amount"]', data.tva_amount);
 
-        // TVA
-        if (data.tva_amount) {
-          const tvaInput = document.querySelector('input[name="tva_amount"]');
-          if (tvaInput) tvaInput.value = data.tva_amount.replace(".", ",");
-        }
-
-        // Date
+        // Date (YYYY-MM-DD)
         if (data.date) {
           const dateInput = document.querySelector('input[name="date"]');
           if (dateInput) dateInput.value = data.date;
