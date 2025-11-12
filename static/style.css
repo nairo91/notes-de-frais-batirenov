@@ -1,281 +1,77 @@
+/* ========== Base ========== */
+
 body {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-.navbar-brand {
-    font-size: 1.05rem;
-}
-
-/* Cartes un peu plus jolies */
-.card {
-    border-radius: 0.75rem;
-}
-
-.card-body {
-    padding: 1.5rem;
-}
-
-.table-sm td,
-.table-sm th {
-    padding-top: 0.4rem;
-    padding-bottom: 0.4rem;
-}
-
-/* ---------- Palette et thème ---------- */
-:root{
-  --violet-900: #1b0c2f;
-  --violet-800: #29104e;
-  --violet-700: #3c1472;
-  --violet-600: #54219F;
-  --violet-500: #6B2BD8;  /* accent */
-  --violet-400: #8F5BFF;
-  --bg-deg-start: #100720;
-  --bg-deg-end:   #2b0e4f;
-  --text-strong: #ffffff;
-  --text-normal: #E9E7F1;
-  --text-muted:  #C9C4DA; /* placeholders, aides */
-  --surface-1: rgba(255,255,255,0.06);
-  --surface-2: rgba(255,255,255,0.10);
-  --border-weak: rgba(255,255,255,0.16);
-  --success: #25c08a;
-  --danger:  #ff5d6c;
-  --warning: #ffb74d;
-}
-
-html, body{
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   height: 100%;
-  background: linear-gradient(145deg, var(--bg-deg-start), var(--bg-deg-end));
-  color: var(--text-normal);
+  margin: 0;
+  background: linear-gradient(145deg, #100720, #2b0e4f);
+  color: #f8f5ff; /* texte très clair par défaut */
 }
 
-/* Force un bon contraste sur les titres et labels */
-h1,h2,h3,h4,h5,h6,
-label, .form-label,
-.table thead th{
-  color: var(--text-strong);
-}
-
-/* ---------- Cartes & conteneurs ---------- */
-.card{
-  background: var(--surface-1);
-  border: 1px solid var(--border-weak);
-  backdrop-filter: blur(6px);
-  border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
-}
-
-/* ---------- Table ---------- */
-.table{
-  color: var(--text-normal);
-}
-.table thead{
-  background: var(--surface-2);
-}
-.table tbody tr{
-  border-color: var(--border-weak);
-}
-.table a.btn-link{
-  color: var(--violet-400);
-}
-
-/* ---------- Inputs ---------- */
-.form-control,
-.form-select{
-  background: rgba(255,255,255,0.08);
-  border: 1px solid var(--border-weak);
-  color: var(--text-strong);
-  border-radius: 12px;
-}
-.form-control:focus,
-.form-select:focus{
-  border-color: var(--violet-400);
-  box-shadow: 0 0 0 0.2rem rgba(107, 43, 216, 0.35);
-  background: rgba(255,255,255,0.12);
-  color: var(--text-strong);
-}
-
-/* Placeholders trop sombres → on les éclaircit */
-::placeholder{
-  color: var(--text-muted) !important;
-  opacity: 1;
-}
-
-/* Petits champs date/filtre dans l’entête de droite */
-#filter-date-from,
-#filter-date-to,
-#filter-chantier{
-  background: rgba(255,255,255,0.08);
-  color: var(--text-normal);
-  border: 1px solid var(--border-weak);
-}
-
-/* ---------- Boutons ---------- */
-.btn{
-  border-radius: 12px;
-  border: 1px solid transparent;
-}
-.btn-success{
-  background: linear-gradient(180deg, #2dcc9f, #17a77f);
-  color: #061a14;
-}
-.btn-outline-primary,
-.btn-outline-secondary{
-  color: var(--text-normal);
-  border-color: var(--violet-400);
-}
-.btn-outline-primary:hover,
-.btn-outline-secondary:hover{
-  background: var(--violet-500);
-  border-color: var(--violet-500);
-  color: #fff;
-}
-.btn-primary{
-  background: var(--violet-500);
-  border-color: var(--violet-500);
-}
-
-/* ---------- Badges statut ---------- */
-.badge.bg-success{ background: var(--success) !important; color:#041a12; }
-.badge.bg-danger{  background: var(--danger)  !important; }
-.badge.bg-secondary{ background: var(--violet-600) !important; }
-
-/* ---------- Logo ---------- */
-.app-logo .logo-img{
-  height: 36px; /* ajuste si besoin */
-  width: auto;
-  display: block;
-  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.25));
-}
-.app-logo .logo-text{
-  font-weight: 700;
-  letter-spacing: .4px;
-  color: var(--text-strong);
-}
-
-/* ---------- Petits ajustes d’accessibilité ---------- */
-a, button { outline-color: var(--violet-400); }
-
-/* ====== Lisibilité sur fond sombre ====== */
-
-/* Couleur de texte par défaut sur le fond violet */
-body {
-  color: #f9fafb; /* blanc cassé */
-}
-
-/* Labels des formulaires */
-.form-label {
-  color: #e5e7ff;
-}
-
-/* Champs de formulaire */
-.form-control,
-.form-control:focus {
-  color: #f9fafb;  /* texte dans les inputs */
-  background-color: rgba(15, 10, 40, 0.7);
-  border-color: rgba(148, 163, 255, 0.5);
-}
-
-/* Placeholder (“jj/mm/aaaa”, etc.) */
-.form-control::placeholder {
-  color: rgba(203, 213, 255, 0.7);
-}
-
-/* Texte “gris” de Bootstrap → on l’éclaircit */
-.text-muted {
-  color: #a5b4fc !important;  /* lavande claire */
-}
-
-/* Petits textes dans les en-têtes de cartes */
-.br-card-header small {
-  color: #c7d2fe;
-}
-
-/* Tableau : forcer la couleur des textes */
-.table {
-  color: #f9fafb;
-}
-
-.table thead th {
-  color: #e5e7ff;
-  border-color: rgba(148, 163, 255, 0.35);
-}
-
-.table tbody td {
-  border-color: rgba(30, 64, 175, 0.6);
-}
-
-/* Boutons "Voir" (lien) plus visibles sur fond sombre */
-.btn-link {
-  color: #a5b4fc;
-}
-
-.btn-link:hover {
-  color: #c7d2fe;
-}
-
-.app-logo {
-  padding: 0.35rem 0.75rem;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid rgba(148, 163, 255, 0.4);
-}
-
-.logo-img {
-  height: 32px;
-  width: auto;
-}
-
-.logo-text {
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  color: #e5e7ff;
-}
-
-/* ---------- Lisibilité texte sur fond sombre ---------- */
-
-/* Couleur de texte par défaut très claire */
-body {
-  color: #f8f5ff;
-}
-
-/* Les cartes utilisent la même couleur de texte */
+/* Laisse les cartes hériter de la couleur du body */
 .card,
 .card-header,
 .card-body {
   color: inherit;
 }
 
-/* Labels, cellules de tableau, texte de formulaires */
+/* Cartes un peu plus jolies */
+.card {
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.card-body {
+  padding: 1.5rem;
+}
+
+.table-sm td,
+.table-sm th {
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+}
+
+/* ========== Typo / textes ========== */
+
+/* Titres, labels, tableaux, petits textes… tout en clair */
+h1, h2, h3, h4, h5, h6,
+label,
 .form-label,
+small,
+.card-header,
+.card-body,
 .table,
 .table th,
 .table td {
-  color: #f8f5ff;
+  color: #f8f5ff !important;
 }
 
-/* Texte "muted" (petites infos, tirets, etc.) -> plus clair */
+/* Texte "muted" (aides, tirets, etc.) un peu plus doux mais lisible */
 .text-muted,
 small.text-muted {
-  color: #c7c2ff !important;
-  opacity: 0.95;
+  color: rgba(255, 255, 255, 0.65) !important;
 }
 
-/* Placeholder dans les inputs (jj/mm/aaaa, etc.) */
-.form-control::placeholder {
-  color: #b6afe5 !important;
-  opacity: 1;
-}
+/* ========== Table ========== */
 
-/* Inputs : fond un peu plus clair et bord violet */
-.form-control {
-  background-color: #0c061a;
-  border-color: #3c2f70;
+.table {
   color: #f8f5ff;
 }
 
-/* Texte des boutons liens ("Voir", etc.) */
+.table thead th {
+  color: #e5e7ff;
+  border-color: rgba(148, 163, 255, 0.35);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.table tbody td {
+  border-color: rgba(30, 64, 175, 0.6);
+}
+
+/* liens "Voir" dans le tableau */
 .btn-link {
   color: #a98bff;
 }
@@ -284,64 +80,53 @@ small.text-muted {
   color: #d2bfff;
 }
 
-/* Les petits badges restent lisibles */
-.badge.bg-secondary {
-  background-color: #5c5676;
-  color: #f8f5ff;
-}
+/* ========== Formulaires ========== */
 
-/* Logo texte toujours bien blanc */
-.app-logo,
-.app-logo .logo-text {
-  color: #fdfbff !important;
-}
-
-/* ---------- Lisibilité sur fond sombre ---------- */
-
-/* Couleur de texte par défaut très claire */
-body {
-  color: #f8f5ff;
-}
-
-/* Labels, petits textes, etc. */
-label,
-.form-label,
-small,
-.card-body,
-.card-header,
-.table,
-.table th,
-.table td {
-  color: #f8f5ff !important;
-}
-
-/* Texte "muted" (aide, tirets dans le tableau, etc.) */
-.text-muted {
-  color: rgba(255, 255, 255, 0.65) !important;
-}
-
-/* Champs de formulaire sur fond foncé */
 .form-control,
 .form-select {
   color: #fdfbff !important;
-  background-color: rgba(12, 9, 32, 0.9); /* ton fond actuel */
+  background-color: rgba(12, 9, 32, 0.9);
+  border-color: #3c2f70;
+  border-radius: 12px;
 }
 
-/* Placeholder (jj/mm/aaaa, Ex: Déjeuner client, etc.) */
+/* Placeholders (jj/mm/aaaa, Ex: Déjeuner client…) */
 .form-control::placeholder,
 .form-select::placeholder {
   color: rgba(255, 255, 255, 0.45) !important;
+  opacity: 1;
 }
 
 /* Focus sur les champs : bord violet clair + légère lueur */
 .form-control:focus,
 .form-select:focus {
   color: #ffffff !important;
+  background-color: rgba(8, 5, 25, 0.95);
   border-color: #9f7bff !important;
   box-shadow: 0 0 0 0.2rem rgba(159, 123, 255, 0.35);
 }
 
-/* Boutons outline sur fond sombre (Réinitialiser, Trier, etc.) */
+/* Petits inputs de filtre (date / chantier) à droite */
+#filter-date-from,
+#filter-date-to,
+#filter-chantier {
+  background-color: rgba(12, 9, 32, 0.9);
+  color: #f8f5ff;
+  border-color: #3c2f70;
+}
+
+/* ========== Boutons ========== */
+
+.btn {
+  border-radius: 12px;
+  border: 1px solid transparent;
+}
+
+.btn-success {
+  background: linear-gradient(180deg, #2dcc9f, #17a77f);
+  color: #061a14;
+}
+
 .btn-outline-primary {
   color: #d7c8ff;
   border-color: #9f7bff;
@@ -352,4 +137,62 @@ small,
   color: #ffffff;
   background: linear-gradient(90deg, #8b5cff, #c262ff);
   border-color: transparent;
+}
+
+/* ========== Badges (statuts) ========== */
+
+.badge.bg-success {
+  background: #25c08a !important;
+  color: #041a12;
+}
+.badge.bg-danger {
+  background: #ff5d6c !important;
+}
+.badge.bg-secondary {
+  background: #5c5676 !important;
+  color: #f8f5ff !important;
+}
+
+/* ========== Logo ========== */
+
+/* Logo dans la barre tout en haut (navbar) */
+.navbar-brand .logo-img {
+  height: 22px;      /* petit logo discret en haut */
+  width: auto;
+  display: block;
+}
+
+/* Logo dans la carte "Nouvelle note de frais" */
+.app-logo {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 255, 0.4);
+}
+
+.app-logo .logo-img {
+  height: 28px;      /* un peu plus grand que celui du header */
+  width: auto;
+  display: block;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.25));
+}
+
+.app-logo .logo-text {
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  color: #fdfbff;
+}
+
+/* sécurité : toute image de logo ne dépassera pas cette taille */
+.logo-img {
+  max-height: 32px;
+  width: auto;
+}
+
+/* ========== Accessibilité / focus ========== */
+
+a, button {
+  outline-color: #9f7bff;
 }
