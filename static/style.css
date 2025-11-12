@@ -135,15 +135,21 @@ input::placeholder {
   border-color: rgba(159, 123, 255, 0.5) !important;
 }
 
+/* Lignes du tableau : on colore les cellules, pas seulement les <tr> */
+
 /* Lignes impaires */
-#expenses-table tbody tr {
+#expenses-table tbody tr:nth-child(odd) td {
   background-color: #0e0720 !important;   /* ligne impaire foncée */
-  border-color: rgba(159, 123, 255, 0.25) !important;
 }
 
 /* Lignes paires */
-#expenses-table tbody tr:nth-child(even) {
+#expenses-table tbody tr:nth-child(even) td {
   background-color: #140a2d !important;   /* ligne paire un peu différente */
+}
+
+/* Bordures entre les cellules */
+#expenses-table tbody td {
+  border-color: rgba(159, 123, 255, 0.25) !important;
 }
 
 /* Cellules : texte bien clair */
