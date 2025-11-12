@@ -724,6 +724,31 @@ def format_report_csv(rows):
         ])
     return output.getvalue()
 
+@app.route("/admin/export_last_month")
+def admin_export_last_month():
+    # --- petite sécurité avec un "secret" dans l'URL ---
+    api_key = request.args.get("key", "")
+    if api_key != os.environ.get("EXPORT_API_KEY", "dev-secret"):
+        return "Non autorisé", 403
+
+    # On calcule le mois précédent
+    today = date.today()
+    month = today.month - 1 or 12
+    year = today.year if today.month > 1 else today.year - 1
+
+    # On génère les données
+    rows = generate_monthly_report(year, month)
+    csv_content = format_report_csv(rows)
+
+    filename = f"notes-de-frais-{year}-{month:02d}.csv"
+    return Response(
+        csv_content,
+        mimetype="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )
+
 
 def send_report_email(year: int, month: int):
     import smtplib
