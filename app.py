@@ -94,7 +94,7 @@ def init_db():
         );
     """)
 
-    # Table expenses (avec status + validation + HT/TVA)
+    # Table expenses (avec status + validation + HT/TVA + payment_method + comment_text)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS expenses (
             id SERIAL PRIMARY KEY,
@@ -105,6 +105,8 @@ def init_db():
             date DATE NOT NULL,
             label TEXT NOT NULL,
             chantier TEXT NOT NULL,
+            payment_method TEXT,
+            comment_text TEXT,
             receipt_path TEXT,
             status TEXT NOT NULL DEFAULT 'pending',
             validated_by TEXT,
@@ -113,7 +115,7 @@ def init_db():
         );
     """)
 
-    # Ajout des colonnes HT / TVA si base déjà existante
+    # Ajout des colonnes HT / TVA / moyen de paiement / commentaire si base déjà existante
     cur.execute("""
         ALTER TABLE expenses
         ADD COLUMN IF NOT EXISTS amount_ht NUMERIC(10,2);
@@ -121,6 +123,14 @@ def init_db():
     cur.execute("""
         ALTER TABLE expenses
         ADD COLUMN IF NOT EXISTS tva_amount NUMERIC(10,2);
+    """)
+    cur.execute("""
+        ALTER TABLE expenses
+        ADD COLUMN IF NOT EXISTS payment_method TEXT;
+    """)
+    cur.execute("""
+        ALTER TABLE expenses
+        ADD COLUMN IF NOT EXISTS comment_text TEXT;
     """)
 
     conn.commit()
@@ -310,6 +320,10 @@ def expenses():
         label = request.form.get("label")
         chantier = request.form.get("chantier")
 
+        # Nouveaux champs optionnels
+        payment_method = (request.form.get("payment_method") or "").strip() or None
+        comment_text = (request.form.get("comment_text") or "").strip() or None
+
         # Validation basique
         if not all([amount, date_str, label, chantier]):
             flash("Tous les champs marqués * sont obligatoires.", "danger")
@@ -333,10 +347,12 @@ def expenses():
                 """
                 INSERT INTO expenses
                     (user_email, amount, amount_ht, tva_amount,
-                     date, label, chantier, receipt_path, created_at)
+                     date, label, chantier, payment_method, comment_text,
+                     receipt_path, created_at)
                 VALUES
                     (%s, %s, %s, %s,
-                     %s, %s, %s, %s, %s)
+                     %s, %s, %s, %s, %s,
+                     %s, %s)
                 """,
                 (
                     current_user,
@@ -346,6 +362,8 @@ def expenses():
                     date_str,
                     label,
                     chantier,
+                    payment_method,
+                    comment_text,
                     receipt_path,
                     datetime.utcnow(),
                 )
@@ -362,7 +380,7 @@ def expenses():
         cur.execute(
             """
             SELECT id, user_email, amount, amount_ht, tva_amount,
-                   date, label, chantier,
+                   date, label, chantier, payment_method, comment_text,
                    receipt_path, created_at, status, validated_by, validated_at
             FROM expenses
             ORDER BY date DESC, id DESC
@@ -373,7 +391,7 @@ def expenses():
         cur.execute(
             """
             SELECT id, user_email, amount, amount_ht, tva_amount,
-                   date, label, chantier,
+                   date, label, chantier, payment_method, comment_text,
                    receipt_path, created_at, status, validated_by, validated_at
             FROM expenses
             WHERE user_email = %s
@@ -396,11 +414,13 @@ def expenses():
             "date": r[5].strftime("%Y-%m-%d"),
             "label": r[6],
             "chantier": r[7],
-            "receipt_path": r[8],
-            "created_at": r[9].isoformat(),
-            "status": r[10],
-            "validated_by": r[11],
-            "validated_at": r[12].isoformat() if r[12] else None,
+            "payment_method": r[8],
+            "comment_text": r[9],
+            "receipt_path": r[10],
+            "created_at": r[11].isoformat(),
+            "status": r[12],
+            "validated_by": r[13],
+            "validated_at": r[14].isoformat() if r[14] else None,
         })
 
     return render_template(
@@ -426,7 +446,7 @@ def api_expenses():
         cur.execute(
             """
             SELECT id, user_email, amount, amount_ht, tva_amount,
-                   date, label, chantier,
+                   date, label, chantier, payment_method, comment_text,
                    receipt_path, created_at, status, validated_by, validated_at
             FROM expenses
             ORDER BY date DESC, id DESC
@@ -436,7 +456,7 @@ def api_expenses():
         cur.execute(
             """
             SELECT id, user_email, amount, amount_ht, tva_amount,
-                   date, label, chantier,
+                   date, label, chantier, payment_method, comment_text,
                    receipt_path, created_at, status, validated_by, validated_at
             FROM expenses
             WHERE user_email = %s
@@ -459,11 +479,13 @@ def api_expenses():
             "date": r[5].strftime("%Y-%m-%d"),
             "label": r[6],
             "chantier": r[7],
-            "receipt_path": r[8],
-            "created_at": r[9].isoformat(),
-            "status": r[10],
-            "validated_by": r[11],
-            "validated_at": r[12].isoformat() if r[12] else None,
+            "payment_method": r[8],
+            "comment_text": r[9],
+            "receipt_path": r[10],
+            "created_at": r[11].isoformat(),
+            "status": r[12],
+            "validated_by": r[13],
+            "validated_at": r[14].isoformat() if r[14] else None,
         })
     return jsonify(data)
 
@@ -682,7 +704,8 @@ def generate_monthly_report(year: int, month: int, approved_only: bool = True):
 
     query = """
         SELECT user_email, amount, amount_ht, tva_amount,
-               date, label, chantier, receipt_path, status
+               date, label, chantier, payment_method, comment_text,
+               receipt_path, status
         FROM expenses
         WHERE date >= %s AND date < %s
     """
@@ -707,8 +730,10 @@ def generate_monthly_report(year: int, month: int, approved_only: bool = True):
             "date": r[4].strftime("%Y-%m-%d"),
             "label": r[5],
             "chantier": r[6],
-            "receipt_path": r[7],
-            "status": r[8],
+            "payment_method": r[7],
+            "comment_text": r[8],
+            "receipt_path": r[9],
+            "status": r[10],
         })
     return result
 
@@ -720,7 +745,9 @@ def format_report_csv(rows):
     writer = csv_module.writer(output, delimiter=";")
     writer.writerow([
         "Date", "Montant TTC", "Montant HT", "TVA",
-        "Libellé", "Chantier", "Utilisateur", "Statut", "Justificatif"
+        "Libellé", "Chantier", "Utilisateur",
+        "Moyen de paiement", "Commentaire",
+        "Statut", "Justificatif"
     ])
     for r in rows:
         writer.writerow([
@@ -731,6 +758,8 @@ def format_report_csv(rows):
             r["label"],
             r["chantier"],
             r["user_email"],
+            r.get("payment_method") or "",
+            r.get("comment_text") or "",
             r.get("status", ""),
             r["receipt_path"] or "",
         ])
@@ -893,6 +922,8 @@ def admin_export_all_now():
             tva_amount,
             label,
             chantier,
+            payment_method,
+            comment_text,
             user_email,
             receipt_path,
             status,
@@ -916,6 +947,8 @@ def admin_export_all_now():
         "TVA",
         "Libellé",
         "Chantier",
+        "Moyen de paiement",
+        "Commentaire",
         "Utilisateur",
         "Justificatif",
         "Statut",
@@ -930,11 +963,13 @@ def admin_export_all_now():
         tva_amount = float(r[3]) if r[3] is not None else ""
         label = r[4] or ""
         chantier = r[5] or ""
-        user_email = r[6] or ""
-        receipt_path = r[7] or ""
-        status = r[8] or ""
-        validated_by = r[9] or ""
-        validated_at = r[10].strftime("%Y-%m-%d %H:%M:%S") if r[10] else ""
+        payment_method = r[6] or ""
+        comment_text = r[7] or ""
+        user_email = r[8] or ""
+        receipt_path = r[9] or ""
+        status = r[10] or ""
+        validated_by = r[11] or ""
+        validated_at = r[12].strftime("%Y-%m-%d %H:%M:%S") if r[12] else ""
 
         writer.writerow([
             date_val,
@@ -943,6 +978,8 @@ def admin_export_all_now():
             tva_amount,
             label,
             chantier,
+            payment_method,
+            comment_text,
             user_email,
             receipt_path,
             status,

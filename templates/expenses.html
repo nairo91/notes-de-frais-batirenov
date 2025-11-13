@@ -49,7 +49,7 @@
             </div>
           </div>
 
-          <!-- Date avec petit bouton calendrier (optionnel mais pratique) -->
+          <!-- Date avec petit bouton calendrier -->
           <div>
             <label class="form-label">Date *</label>
             <div class="date-filter-group">
@@ -60,12 +60,7 @@
                      required>
               <button type="button"
                       class="date-filter-btn"
-                      onclick="
-  const expenseInput = document.getElementById('expense-date');
-  if (expenseInput && expenseInput.showPicker) { expenseInput.showPicker(); }
-  else { expenseInput && expenseInput.focus(); }
-"
->
+                      onclick="const inputTT=document.getElementById('expense-date'); if(input && input.showPicker){input.showPicker();} else if(input){input.focus();}">
                 🗓
               </button>
             </div>
@@ -79,6 +74,28 @@
           <div>
             <label class="form-label">Chantier *</label>
             <input type="text" class="form-control" name="chantier" placeholder="Ex: Chantier Dupont" required>
+          </div>
+
+          <!-- Moyen de paiement (optionnel) -->
+          <div>
+            <label class="form-label">Moyen de paiement</label>
+            <select class="form-select" name="payment_method">
+              <option value="">-- Sélectionner (optionnel) --</option>
+              <option value="CB perso">CB perso</option>
+              <option value="CB société">CB société</option>
+              <option value="Espèces">Espèces</option>
+              <option value="Virement">Virement</option>
+              <option value="Autre">Autre</option>
+            </select>
+          </div>
+
+          <!-- Commentaire (optionnel) -->
+          <div>
+            <label class="form-label">Commentaire</label>
+            <textarea class="form-control"
+                      name="comment_text"
+                      rows="2"
+                      placeholder="Informations complémentaires (optionnel)"></textarea>
           </div>
 
           <div>
@@ -135,12 +152,7 @@
                      placeholder="Du">
               <button type="button"
                       class="date-filter-btn"
-                     onclick="
-  const fromInput = document.getElementById('filter-date-from');
-  if (fromInput && fromInput.showPicker) { fromInput.showPicker(); }
-  else { fromInput && fromInput.focus(); }
-"
->
+                      onclick="const inputT=document.getElementById('filter-date-from'); if(input && input.showPicker){input.showPicker();} else if(input){input.focus();}">
                 🗓
               </button>
             </div>
@@ -153,11 +165,7 @@
                      placeholder="Au">
               <button type="button"
                       class="date-filter-btn"
-                      onclick="
-                        const input = document.getElementById('filter-date-to');
-                        if (input && input.showPicker) { input.showPicker(); }
-                        else { input && input.focus(); }
-                      ">
+                      onclick="const input=document.getElementById('filter-date-to'); if(input && input.showPicker){input.showPicker();} else if(input){input.focus();}">
                 🗓
               </button>
             </div>
@@ -206,6 +214,8 @@
                 <th>TVA</th>
                 <th>Libellé</th>
                 <th>Chantier</th>
+                <th>Moyen de paiement</th>
+                <th>Commentaire</th>
                 <th>Utilisateur</th>
                 <th>Statut</th>
                 <th>Justificatif</th>
@@ -239,6 +249,20 @@
                 </td>
                 <td>{{ e.label }}</td>
                 <td class="chantier-cell">{{ e.chantier }}</td>
+                <td>
+                  {% if e.payment_method %}
+                    {{ e.payment_method }}
+                  {% else %}
+                    <span class="text-muted">-</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if e.comment_text %}
+                    {{ e.comment_text }}
+                  {% else %}
+                    <span class="text-muted">-</span>
+                  {% endif %}
+                </td>
                 <td>{{ e.user_email }}</td>
                 <td>
                   {% if e.status == 'approved' %}
