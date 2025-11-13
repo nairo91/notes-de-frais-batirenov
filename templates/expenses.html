@@ -59,10 +59,11 @@
                      id="expense-date"
                      required>
               <button type="button"
-                      class="date-filter-btn"
-                      onclick="const inputTT=document.getElementById('expense-date'); if(input && input.showPicker){input.showPicker();} else if(input){input.focus();}">
-                🗓
-              </button>
+        class="date-filter-btn"
+        onclick="const expenseDateInput = document.getElementById('expense-date'); if (expenseDateInput && expenseDateInput.showPicker) { expenseDateInput.showPicker(); } else if (expenseDateInput) { expenseDateInput.focus(); }">
+  🗓
+</button>
+
             </div>
           </div>
 
@@ -150,11 +151,14 @@
                      id="filter-date-from"
                      class="form-control form-control-sm"
                      placeholder="Du">
-              <button type="button"
-                      class="date-filter-btn"
-                      onclick="const inputT=document.getElementById('filter-date-from'); if(input && input.showPicker){input.showPicker();} else if(input){input.focus();}">
-                🗓
-              </button>
+                        <button type="button"
+                        class="date-filter-btn"
+                        onclick="const filterFromInput = document.getElementById('filter-date-from'); if (filterFromInput && filterFromInput.showPicker) { filterFromInput.showPicker(); } else if (filterFromInput) { filterFromInput.focus(); }">
+                  🗓
+                </button>
+
+
+
             </div>
 
             <!-- Date "Au" avec bouton calendrier -->
@@ -163,11 +167,13 @@
                      id="filter-date-to"
                      class="form-control form-control-sm"
                      placeholder="Au">
-              <button type="button"
-                      class="date-filter-btn"
-                      onclick="const input=document.getElementById('filter-date-to'); if(input && input.showPicker){input.showPicker();} else if(input){input.focus();}">
-                🗓
-              </button>
+            <button type="button"
+        class="date-filter-btn"
+        onclick="const filterToInput = document.getElementById('filter-date-to'); if (filterToInput && filterToInput.showPicker) { filterToInput.showPicker(); } else if (filterToInput) { filterToInput.focus(); }">
+  🗓
+</button>
+
+
             </div>
 
             <!-- Filtre chantier -->
