@@ -17,7 +17,17 @@ import cloudinary
 import cloudinary.uploader
 
 import io
-from PIL import Image
+from PIL import Image as PILImage
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Table,
+    TableStyle,
+    Image as RLImage,
+    PageBreak,
+)
 
 # -----------------------------------------------------------------------------#
 # CONFIG FLASK
@@ -607,7 +617,7 @@ def scan_receipt():
 
     # On compresse/redimensionne l'image pour rester < 1 Mo
     try:
-        img = Image.open(file.stream)
+        img = PILImage.open(file.stream)
 
         max_width = 1200
         if img.width > max_width:
@@ -766,6 +776,112 @@ def format_report_csv(rows):
     return output.getvalue()
 
 
+def generate_pdf_report(rows):
+    """Génère un PDF avec un tableau récapitulatif puis les justificatifs en plein format."""
+    pdf_buffer = io.BytesIO()
+    doc = SimpleDocTemplate(pdf_buffer, pagesize=A4)
+    elements = []
+
+    headers = [
+        "Date",
+        "Montant TTC",
+        "Montant HT",
+        "TVA",
+        "Libellé",
+        "Chantier",
+        "Moyen de paiement",
+        "Commentaire",
+        "Utilisateur",
+        "Statut",
+    ]
+
+    def fmt_amount(value):
+        if value is None:
+            return ""
+        try:
+            return f"{float(value):.2f} €"
+        except (TypeError, ValueError):
+            return ""
+
+    table_data = [headers]
+    for r in rows:
+        table_data.append([
+            r.get("date", ""),
+            fmt_amount(r.get("amount")),
+            fmt_amount(r.get("amount_ht")),
+            fmt_amount(r.get("tva_amount")),
+            r.get("label", ""),
+            r.get("chantier", ""),
+            r.get("payment_method") or "",
+            r.get("comment_text") or "",
+            r.get("user_email", ""),
+            r.get("status", ""),
+        ])
+
+    col_widths = [
+        45,
+        45,
+        45,
+        35,
+        55,
+        40,
+        40,
+        60,
+        50,
+        36,
+    ]
+
+    table = Table(table_data, colWidths=col_widths)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ALIGN", (1, 1), (3, -1), "RIGHT"),
+    ]))
+
+    elements.append(table)
+
+    max_width = A4[0] - 40 * mm
+    max_height = A4[1] - 40 * mm
+
+    for r in rows:
+        receipt_path = r.get("receipt_path")
+        if not receipt_path:
+            continue
+
+        elements.append(PageBreak())
+
+        try:
+            if receipt_path.startswith("http"):
+                resp = requests.get(receipt_path, timeout=30)
+                resp.raise_for_status()
+                img_bytes = io.BytesIO(resp.content)
+            else:
+                local_path = os.path.join(app.config["UPLOAD_FOLDER"], receipt_path)
+                if not os.path.exists(local_path):
+                    continue
+                with open(local_path, "rb") as f:
+                    img_bytes = io.BytesIO(f.read())
+
+            img_bytes.seek(0)
+            pil_img = PILImage.open(img_bytes)
+            width, height = pil_img.size
+            ratio = min(max_width / float(width), max_height / float(height), 1)
+            new_width = width * ratio
+            new_height = height * ratio
+
+            img_bytes.seek(0)
+            elements.append(RLImage(img_bytes, width=new_width, height=new_height))
+        except Exception:
+            continue
+
+    doc.build(elements)
+    pdf_buffer.seek(0)
+    return pdf_buffer.getvalue()
+
+
 @app.route("/admin/export_last_month")
 def admin_export_last_month():
     """
@@ -901,6 +1017,32 @@ def admin_export():
     )
 
 
+@app.route("/admin/export_pdf")
+@admin_required
+def admin_export_pdf():
+    """Export PDF des notes de frais (tous statuts) pour un mois donné."""
+    try:
+        year = int(request.args.get("year"))
+        month = int(request.args.get("month"))
+    except (TypeError, ValueError):
+        return "Paramètres year et month invalides", 400
+
+    if month < 1 or month > 12:
+        return "Paramètre month invalide", 400
+
+    rows = generate_monthly_report(year, month, approved_only=False)
+    pdf_bytes = generate_pdf_report(rows)
+
+    filename = f"notes-de-frais-{year}-{month:02d}.pdf"
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        },
+    )
+
+
 @app.route("/admin/export_all_now")
 @admin_required
 def admin_export_all_now():
@@ -996,6 +1138,61 @@ def admin_export_all_now():
         headers={
             "Content-Disposition": f"attachment; filename={filename}"
         }
+    )
+
+
+@app.route("/admin/export_pdf_all_now")
+@admin_required
+def admin_export_pdf_all_now():
+    """Export PDF de toutes les notes de frais (tous statuts, toutes dates)."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT
+            date,
+            amount,
+            amount_ht,
+            tva_amount,
+            label,
+            chantier,
+            payment_method,
+            comment_text,
+            user_email,
+            receipt_path,
+            status
+        FROM expenses
+        ORDER BY date ASC, id ASC
+        """
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    formatted_rows = []
+    for r in rows:
+        formatted_rows.append({
+            "date": r[0].strftime("%Y-%m-%d") if r[0] else "",
+            "amount": float(r[1]) if r[1] is not None else None,
+            "amount_ht": float(r[2]) if r[2] is not None else None,
+            "tva_amount": float(r[3]) if r[3] is not None else None,
+            "label": r[4] or "",
+            "chantier": r[5] or "",
+            "payment_method": r[6],
+            "comment_text": r[7],
+            "user_email": r[8] or "",
+            "receipt_path": r[9],
+            "status": r[10] or "",
+        })
+
+    pdf_bytes = generate_pdf_report(formatted_rows)
+    filename = f"notes-de-frais-ALL-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.pdf"
+
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        },
     )
 
 
