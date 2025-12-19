@@ -28,6 +28,7 @@ from reportlab.platypus import (
     Image as RLImage,
     PageBreak,
     Paragraph,
+    Spacer,
 )
 from reportlab.lib.styles import ParagraphStyle
 
@@ -857,9 +858,6 @@ def generate_pdf_report(rows):
 
     elements.append(table)
 
-    max_width = doc.width
-    max_height = doc.height
-
     for r in rows:
         receipt_path = r.get("receipt_path")
         if not receipt_path:
@@ -880,15 +878,15 @@ def generate_pdf_report(rows):
                     img_bytes = io.BytesIO(f.read())
 
             img_bytes.seek(0)
-            pil_img = PILImage.open(img_bytes)
-            width, height = pil_img.size
-            ratio = min(max_width / float(width), max_height / float(height), 1)
-            new_width = width * ratio
-            new_height = height * ratio
 
-            img_bytes.seek(0)
-            elements.append(RLImage(img_bytes, width=new_width, height=new_height))
-        except Exception:
+            img = RLImage(img_bytes)
+            img.hAlign = "CENTER"
+            img._restrictSize(doc.width, doc.height - 5)
+
+            elements.append(img)
+            elements.append(Spacer(1, 5 * mm))
+        except Exception as e:
+            print(f"[PDF] Erreur image {receipt_path}: {e!r}", flush=True)
             continue
 
     doc.build(elements)
