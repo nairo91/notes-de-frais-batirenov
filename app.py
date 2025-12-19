@@ -30,6 +30,7 @@ from reportlab.platypus import (
     Paragraph,
     Spacer,
 )
+from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.styles import ParagraphStyle
 
 # -----------------------------------------------------------------------------#
@@ -799,17 +800,25 @@ def generate_pdf_report(rows):
         leading=10,
     )
 
+    header_style = ParagraphStyle(
+        name="HeaderCell",
+        fontName="Helvetica-Bold",
+        fontSize=7,
+        leading=8,
+        alignment=TA_CENTER,
+    )
+
     headers = [
-        "Date",
-        "Montant TTC",
-        "Montant HT",
-        "TVA",
-        "Libellé",
-        "Chantier",
-        "Moyen de paiement",
-        "Commentaire",
-        "Utilisateur",
-        "Statut",
+        Paragraph("Date", header_style),
+        Paragraph("Montant<br/>TTC", header_style),
+        Paragraph("Montant<br/>HT", header_style),
+        Paragraph("TVA", header_style),
+        Paragraph("Libellé", header_style),
+        Paragraph("Chantier", header_style),
+        Paragraph("Moyen de<br/>paiement", header_style),
+        Paragraph("Commentaire", header_style),
+        Paragraph("Utilisateur", header_style),
+        Paragraph("Statut", header_style),
     ]
 
     def fmt_amount(value):
@@ -840,7 +849,7 @@ def generate_pdf_report(rows):
             wrap_text(r.get("status", "")),
         ])
 
-    width_ratios = [0.07, 0.07, 0.07, 0.05, 0.16, 0.15, 0.12, 0.12, 0.14, 0.05]
+    width_ratios = [0.09, 0.08, 0.08, 0.06, 0.16, 0.12, 0.10, 0.12, 0.14, 0.05]
     col_widths = [doc.width * r for r in width_ratios]
 
     table = Table(table_data, colWidths=col_widths)
@@ -849,9 +858,13 @@ def generate_pdf_report(rows):
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
         ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+        ("VALIGN", (0, 0), (-1, 0), "MIDDLE"),
+        ("VALIGN", (0, 1), (-1, -1), "TOP"),
         ("ALIGN", (1, 1), (3, -1), "RIGHT"),
         ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, 0), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 4),
         ("LEFTPADDING", (0, 0), (-1, -1), 2),
         ("RIGHTPADDING", (0, 0), (-1, -1), 2),
     ]))
