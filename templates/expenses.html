@@ -312,6 +312,12 @@
                         ✕
                       </button>
                     </form>
+                    <form method="post" action="{{ url_for('delete_expense', expense_id=e.id) }}" class="d-inline ms-1"
+                          onsubmit="return confirm('Supprimer cette note ?');">
+                      <button type="submit" class="btn btn-outline-danger btn-sm">
+                        🗑
+                      </button>
+                    </form>
                   </td>
                 {% endif %}
               </tr>
