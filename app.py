@@ -781,7 +781,14 @@ def format_report_csv(rows):
 def generate_pdf_report(rows):
     """Génère un PDF avec un tableau récapitulatif puis les justificatifs en plein format."""
     pdf_buffer = io.BytesIO()
-    doc = SimpleDocTemplate(pdf_buffer, pagesize=A4)
+    doc = SimpleDocTemplate(
+        pdf_buffer,
+        pagesize=A4,
+        rightMargin=20 * mm,
+        leftMargin=20 * mm,
+        topMargin=20 * mm,
+        bottomMargin=20 * mm,
+    )
     elements = []
 
     paragraph_style = ParagraphStyle(
@@ -789,7 +796,6 @@ def generate_pdf_report(rows):
         fontName="Helvetica",
         fontSize=8,
         leading=10,
-        wordWrap="LTR",
     )
 
     headers = [
@@ -833,9 +839,8 @@ def generate_pdf_report(rows):
             wrap_text(r.get("status", "")),
         ])
 
-    page_width = A4[0] - 2 * 20 * mm
-    width_ratios = [0.08, 0.08, 0.08, 0.06, 0.18, 0.16, 0.12, 0.12, 0.12, 0.08]
-    col_widths = [page_width * r for r in width_ratios]
+    width_ratios = [0.07, 0.07, 0.07, 0.05, 0.16, 0.15, 0.12, 0.12, 0.14, 0.05]
+    col_widths = [doc.width * r for r in width_ratios]
 
     table = Table(table_data, colWidths=col_widths)
     table.setStyle(TableStyle([
@@ -852,8 +857,8 @@ def generate_pdf_report(rows):
 
     elements.append(table)
 
-    max_width = A4[0] - 40 * mm
-    max_height = A4[1] - 40 * mm
+    max_width = doc.width
+    max_height = doc.height
 
     for r in rows:
         receipt_path = r.get("receipt_path")
