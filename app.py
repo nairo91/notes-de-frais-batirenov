@@ -818,18 +818,9 @@ def generate_pdf_report(rows):
             r.get("status", ""),
         ])
 
-    col_widths = [
-        45,
-        45,
-        45,
-        35,
-        55,
-        40,
-        40,
-        60,
-        50,
-        36,
-    ]
+    page_width = A4[0] - 2 * 20 * mm
+    width_ratios = [0.08, 0.08, 0.08, 0.06, 0.18, 0.16, 0.12, 0.12, 0.12, 0.08]
+    col_widths = [page_width * r for r in width_ratios]
 
     table = Table(table_data, colWidths=col_widths)
     table.setStyle(TableStyle([
@@ -839,6 +830,9 @@ def generate_pdf_report(rows):
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("ALIGN", (1, 1), (3, -1), "RIGHT"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("LEFTPADDING", (0, 0), (-1, -1), 2),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 2),
     ]))
 
     elements.append(table)
@@ -1238,6 +1232,27 @@ def reject_expense(expense_id):
     conn.commit()
     conn.close()
     flash("Note de frais refusée.", "warning")
+    return redirect(url_for("expenses"))
+
+
+@app.route("/admin/expenses/<int:expense_id>/delete", methods=["POST"])
+@admin_required
+def delete_expense(expense_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT receipt_path FROM expenses WHERE id = %s", (expense_id,))
+    row = cur.fetchone()
+    if row and row[0]:
+        path = row[0]
+        if not path.startswith("http"):
+            local_path = os.path.join(app.config["UPLOAD_FOLDER"], path)
+            if os.path.exists(local_path):
+                os.remove(local_path)
+
+    cur.execute("DELETE FROM expenses WHERE id = %s", (expense_id,))
+    conn.commit()
+    conn.close()
+    flash("Note de frais supprimée.", "success")
     return redirect(url_for("expenses"))
 
 
