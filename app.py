@@ -881,10 +881,8 @@ def generate_pdf_report(rows):
 
             img = RLImage(img_bytes)
             img.hAlign = "CENTER"
-            img._restrictSize(doc.width, doc.height - 5)
-
+            img._restrictSize(doc.width, doc.height - 30)  # marge safe
             elements.append(img)
-            elements.append(Spacer(1, 5 * mm))
         except Exception as e:
             print(f"[PDF] Erreur image {receipt_path}: {e!r}", flush=True)
             continue
