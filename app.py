@@ -27,7 +27,9 @@ from reportlab.platypus import (
     TableStyle,
     Image as RLImage,
     PageBreak,
+    Paragraph,
 )
+from reportlab.lib.styles import ParagraphStyle
 
 # -----------------------------------------------------------------------------#
 # CONFIG FLASK
@@ -782,6 +784,14 @@ def generate_pdf_report(rows):
     doc = SimpleDocTemplate(pdf_buffer, pagesize=A4)
     elements = []
 
+    paragraph_style = ParagraphStyle(
+        name="TableCell",
+        fontName="Helvetica",
+        fontSize=8,
+        leading=10,
+        wordWrap="LTR",
+    )
+
     headers = [
         "Date",
         "Montant TTC",
@@ -803,6 +813,11 @@ def generate_pdf_report(rows):
         except (TypeError, ValueError):
             return ""
 
+    def wrap_text(value):
+        if not value:
+            return ""
+        return Paragraph(str(value), paragraph_style)
+
     table_data = [headers]
     for r in rows:
         table_data.append([
@@ -810,12 +825,12 @@ def generate_pdf_report(rows):
             fmt_amount(r.get("amount")),
             fmt_amount(r.get("amount_ht")),
             fmt_amount(r.get("tva_amount")),
-            r.get("label", ""),
-            r.get("chantier", ""),
-            r.get("payment_method") or "",
-            r.get("comment_text") or "",
-            r.get("user_email", ""),
-            r.get("status", ""),
+            wrap_text(r.get("label", "")),
+            wrap_text(r.get("chantier", "")),
+            wrap_text(r.get("payment_method") or ""),
+            wrap_text(r.get("comment_text") or ""),
+            wrap_text(r.get("user_email", "")),
+            wrap_text(r.get("status", "")),
         ])
 
     page_width = A4[0] - 2 * 20 * mm
