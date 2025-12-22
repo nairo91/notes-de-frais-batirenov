@@ -80,6 +80,7 @@ def upload_receipt(file):
 # CONFIG BASE DE DONNÉES (PostgreSQL)
 # -----------------------------------------------------------------------------#
 DATABASE_URL = os.environ.get("DATABASE_URL")
+SKIP_INIT_DB = os.environ.get("SKIP_INIT_DB") == "1"
 
 
 def get_db():
@@ -151,8 +152,9 @@ def init_db():
     conn.close()
 
 
-# IMPORTANT : on initialise la DB au chargement du module
-init_db()
+# IMPORTANT : on initialise la DB au chargement du module (sauf si désactivé)
+if not SKIP_INIT_DB:
+    init_db()
 
 
 def sync_users_from_csv():
@@ -212,7 +214,39 @@ def sync_users_from_csv():
 
 
 # synchro au chargement
-sync_users_from_csv()
+if not SKIP_INIT_DB:
+    sync_users_from_csv()
+
+# -----------------------------------------------------------------------------#
+# GÉNÉRATION DES CHAMBRES POUR UN CHANTIER
+# -----------------------------------------------------------------------------#
+def generate_chambres(max_floor=5, max_room_number=26):
+    """Retourne la liste des chambres à créer automatiquement.
+
+    - Les étages vont de 0 à ``max_floor`` (inclus), par exemple R+5 => ``max_floor=5``.
+    - Les chambres s'arrêtent systématiquement à 26 (026, 126, ..., 526) quelle que soit
+      la valeur demandée.
+    """
+    try:
+        max_floor_int = int(max_floor)
+    except (TypeError, ValueError):
+        max_floor_int = 0
+
+    # On ne dépasse jamais 26 chambres par étage
+    try:
+        max_room_int = min(int(max_room_number), 26)
+    except (TypeError, ValueError):
+        max_room_int = 26
+
+    if max_floor_int < 0 or max_room_int <= 0:
+        return []
+
+    chambres = []
+    for floor in range(max_floor_int + 1):
+        for room in range(1, max_room_int + 1):
+            chambres.append(f"{floor}{room:02d}")
+    return chambres
+
 
 # -----------------------------------------------------------------------------#
 # AUTH / ROLES
@@ -502,6 +536,18 @@ def api_expenses():
             "validated_at": r[14].isoformat() if r[14] else None,
         })
     return jsonify(data)
+
+
+# -----------------------------------------------------------------------------#
+# API : Génération automatique des chambres d'un chantier
+# -----------------------------------------------------------------------------#
+@app.route("/api/chantiers/chambres")
+@login_required
+def api_chantier_chambres():
+    max_floor = request.args.get("max_floor", default=5, type=int)
+    chambres = generate_chambres(max_floor=max_floor)
+    return jsonify({"chambres": chambres})
+
 
 # -----------------------------------------------------------------------------#
 # OCR : Scan d'un ticket pour pré-remplir la note (TTC / HT / TVA)
