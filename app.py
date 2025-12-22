@@ -383,6 +383,10 @@ def expenses():
                 )
             )
             conn.commit()
+            try:
+                send_new_expense_email()
+            except Exception as e:
+                print(f"[MAIL] Notification nouvelle note échouée : {e!r}", flush=True)
             flash("Note de frais ajoutée avec succès ✅", "success")
 
         conn.close()
@@ -986,6 +990,41 @@ def send_report_email(year: int, month: int):
         # log bien visible dans Render
         print(f"[MAIL] ERREUR SMTP : {e!r}", flush=True)
         # on relance l'erreur pour provoquer un 500 (mais avec un log clair)
+        raise
+
+
+def send_new_expense_email():
+    """Envoi d'une notification simple pour chaque nouvelle note de frais."""
+    import smtplib
+    from email.message import EmailMessage
+
+    host = os.environ.get("SMTP_HOST")
+    port = int(os.environ.get("SMTP_PORT", "587"))
+    user = os.environ.get("SMTP_USER")
+    password = os.environ.get("SMTP_PASSWORD")
+    from_addr = os.environ.get("SMTP_FROM", "no-reply@batirenov.info")
+
+    if not host:
+        print("[MAIL] SMTP_HOST non configuré, notification non envoyée", flush=True)
+        return
+
+    msg = EmailMessage()
+    msg["Subject"] = "Nouvelle note de frais"
+    msg["From"] = from_addr
+    msg["To"] = "compta@batirenov.info"
+    msg.set_content("Une nouvelle note de frais vient d'arriver !")
+
+    print(f"[MAIL] Envoi notification nouvelle note via {host}:{port}", flush=True)
+
+    try:
+        with smtplib.SMTP(host, port, timeout=10) as server:
+            server.starttls()
+            if user and password:
+                server.login(user, password)
+            server.send_message(msg)
+        print("[MAIL] Notification nouvelle note envoyée", flush=True)
+    except Exception as e:
+        print(f"[MAIL] ERREUR SMTP nouvelle note : {e!r}", flush=True)
         raise
 
 
